@@ -1,0 +1,235 @@
+// hjj: tbd, float num
+#include "o_wrap.h"
+
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#include "e_tac.h"
+
+/* global var */
+int tos; /* top of static */
+int tof; /* top of frame */
+int oof; /* offset of formal */
+int oon; /* offset of next frame */
+
+// 生成开始段
+void asm_head() {
+	char head[] =
+		"	# head\n"
+		"	.text\n";
+	input_str(obj_file, "%s", head);
+}
+
+// 生成结束段
+void asm_tail() {
+	char tail[] =
+		"\n	# tail\n"
+		"	.ident \"tiny-compiler\"\n";
+
+	input_str(obj_file, "%s", tail);
+}
+
+
+//TODO:
+// 生成字符串数据段
+void asm_str(struct id *s) {
+	const char *t = s->name; /* The text */
+	int i;
+
+	input_str(obj_file, "L%u:\n", s->label); /* Label for the string */
+	input_str(obj_file, "	DBS ");			 /* Label for the string */
+
+	for (i = 1; t[i + 1] != 0; i++) {
+		if (t[i] == '\\') {
+			switch (t[++i]) {
+				case 'n':
+					input_str(obj_file, "%u,", '\n');
+					break;
+
+				case '\"':
+					input_str(obj_file, "%u,", '\"');
+					break;
+			}
+		} else
+			input_str(obj_file, "%u,", t[i]);
+	}
+
+	input_str(obj_file, "0\n"); /* End of string */
+}
+
+// 生成静态数据段
+void asm_static(void) {
+	int i;
+
+	struct id *sl;
+
+	for (sl = id_global; sl != NULL; sl = sl->next) {
+		if (sl->id_type == ID_STRING) asm_str(sl);
+	}
+
+	input_str(obj_file, "STATIC:\n");
+	input_str(obj_file, "	DBN 0,%u\n", tos);
+	input_str(obj_file, "STACK:\n");
+}
+
+// 根据单条三地址码，生成汇编代码
+void asm_code(struct tac *code) {
+	int r;
+
+	switch (code->type) {
+		case TAC_UNDEF:
+			perror("cannot translate TAC_UNDEF");
+			return;
+
+		case TAC_PLUS:
+			asm_bin("add", code->id_1, code->id_2, code->id_3);
+			return;
+
+		case TAC_MINUS:
+			asm_bin("sub", code->id_1, code->id_2, code->id_3);
+			return;
+
+		case TAC_MULTIPLY:
+			asm_bin("mul", code->id_1, code->id_2, code->id_3);
+			return;
+
+		case TAC_DIVIDE:
+			asm_bin("div", code->id_1, code->id_2, code->id_3);
+			return;
+
+		case TAC_EQ:
+		case TAC_NE:
+		case TAC_LT:
+		case TAC_LE:
+		case TAC_GT:
+		case TAC_GE:
+			asm_cmp(code->type, code->id_1, code->id_2, code->id_3);
+			return;
+
+		case TAC_ASSIGN:
+			r = reg_find(code->id_2);
+			rdesc_fill(r, code->id_1, MODIFIED);
+			asm_store_var(code->id_1, reg_name[r]);
+			return;
+
+		// case TAC_INPUT:
+		// 	r = reg_find(code->id_1);
+		// 	input_str(obj_file, "	IN\n");
+		// 	input_str(obj_file, "	LOD R%u,R15\n", r);
+		// 	rdesc[r].mod = MODIFIED;
+		// 	return;
+
+		// case TAC_OUTPUT:
+		// 	if (code->id_1->id_type == ID_VAR) {
+		// 		r = reg_find(code->id_1);
+		// 		input_str(obj_file, "	LOD R15,R%u\n", r);
+		// 		input_str(obj_file, "	OUTN\n");
+		// 	} else if (code->id_1->id_type == ID_STRING) {
+		// 		r = reg_find(code->id_1);
+		// 		input_str(obj_file, "	LOD R15,R%u\n", r);
+		// 		input_str(obj_file, "	OUTS\n");
+		// 	}
+		// 	return;
+
+		case TAC_GOTO:
+			asm_cond("j", NULL, code->id_1->name);
+			return;
+
+		case TAC_IFZ:
+			asm_cond("beq", code->id_1, code->id_2->name);
+			return;
+
+		case TAC_LABEL:
+			//for (int r = R_GEN; r < R_NUM; r++) asm_write_back(r);
+			for (int r = R_GEN; r < R_NUM; r++) rdesc_clear_all(r);
+			if(code->id_1->id_type==ID_LABEL){
+				input_str(obj_file, ".%s:\n", code->id_1->name);
+			}
+			else if(code->id_1->id_type==ID_FUNC){
+				input_str(obj_file, "	.align	2\n");
+				input_str(obj_file, "	.globl	%s\n", code->id_1->name);
+				input_str(obj_file, "	.type	%s,@function\n", code->id_1->name);
+				input_str(obj_file, "%s:\n", code->id_1->name);
+			}
+
+			return;
+
+		case TAC_ARG:
+			// r = reg_find(code->id_1);
+			// input_str(obj_file, "	STO (R2+%d),R%u\n", tof + oon, r);
+			// oon += 4;
+			return;
+
+		case TAC_PARAM:
+			
+			return;
+
+		case TAC_CALL:
+			asm_call(code,code->id_1, code->id_2);
+			return;
+
+		case TAC_BEGIN:
+			//栈帧迁移
+			scope = 1;
+			asm_stack_pivot(code);
+			asm_param(code);
+			return;
+
+		case TAC_END:
+			//asm_return(NULL);
+			scope = 0;
+			return;
+
+		case TAC_VAR:
+			if (scope) {
+				code->id_1->scope = 1; /* local var */
+				code->id_1->offset = tof;
+				tof -= 4;
+			} else {
+				code->id_1->scope = 0; /* global var */
+				input_str(obj_file, "	.globl	%s\n", code->id_1->name);
+				input_str(obj_file, "	.align	2\n");//XXX:增加数据类型后需要改动,下方同
+				input_str(obj_file, "	.type	%s,@object\n", code->id_1->name);
+				input_str(obj_file, "	.size %s, 4\n", code->id_1->name);//XXX:
+				input_str(obj_file, "%s:\n", code->id_1->name);
+				input_str(obj_file, "	.zero	4");//XXX:
+
+			}
+			return;
+
+		case TAC_RETURN:
+			asm_return(code->id_1);
+			return;
+
+		default:
+			/* Don't know what this one is */
+			perror("unknown TAC opcode to translate");
+			printf("type: %d\n", code->type);
+			return;
+	}
+}
+
+// 根据source_to_tac生成的三地址码，生成汇编代码
+void tac_to_obj() {
+	tof = LOCAL_OFF; /* TOS allows space for link info */
+	oof = FORMAL_OFF;
+	oon = 0;
+
+	for (int r = 0; r < R_NUM; r++) rdesc[r].var = NULL;
+
+	asm_head();
+
+	struct tac *cur;
+	for (cur = tac_head; cur != NULL; cur = cur->next) {
+		input_str(obj_file, "\n\t# ");
+		output_tac(obj_file, cur);
+		// input_str(obj_file, "\n");
+		asm_code(cur);
+	}
+
+	asm_tail();
+	// asm_static();
+}
