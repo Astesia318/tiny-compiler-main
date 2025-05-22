@@ -112,5 +112,5 @@ void asm_write_back(int r);
 void asm_load(int r, struct id *s);
 int reg_find(struct id *s);
 int reg_alloc(struct id *s);
-
+int reg_get();
 #endif // REG_MANAGER_H

@@ -4,9 +4,9 @@ int main()
     char a;
     int b;
     long c;
-    global = 'c';
+
     a = 'b';
-    
-    c = 45;
+    global = a;
+    c = a+global;
     return 0;
 }

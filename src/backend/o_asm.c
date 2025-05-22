@@ -326,8 +326,9 @@ void asm_load_var(struct id *s,const char *r) {
 		input_str(obj_file, "	li %s,%d\n", r,s->num);
 	}
 	else if (s->scope == GLOBAL_TABLE) {
-		input_str(obj_file, "	la a5,%s\n", s->name);
-		input_str(obj_file, "	%s %s,0(a5)\n",LOAD_OP(TYPE_SIZE(s->data_type)),r);
+		int addr_reg = reg_get();
+		input_str(obj_file, "	la %s,%s\n",reg_name[addr_reg], s->name);
+		input_str(obj_file, "	%s %s,0(%s)\n",LOAD_OP(TYPE_SIZE(s->data_type)),r,reg_name[addr_reg]);
 	} 
 	else {
 		input_str(obj_file, "	%s %s,%d(s0)\n",LOAD_OP(TYPE_SIZE(s->data_type)), r,s->offset);
@@ -335,8 +336,9 @@ void asm_load_var(struct id *s,const char *r) {
 }
 void asm_store_var(struct id *s,const char *r) {
 	if (s->scope == GLOBAL_TABLE) {
-		input_str(obj_file, "	la a4,%s\n", s->name);
-		input_str(obj_file, "	%s %s,0(a4)\n",STORE_OP(TYPE_SIZE(s->data_type)),r);
+		int addr_reg = reg_get();
+		input_str(obj_file, "	la %s,%s\n",reg_name[addr_reg], s->name);
+		input_str(obj_file, "	%s %s,0(%s)\n",STORE_OP(TYPE_SIZE(s->data_type)),r,reg_name[addr_reg]);
 	} else {
 		input_str(obj_file, "	%s %s,%d(s0)\n",STORE_OP(TYPE_SIZE(s->data_type)), r,s->offset);
 	}

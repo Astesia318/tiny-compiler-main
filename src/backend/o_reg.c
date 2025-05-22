@@ -82,7 +82,7 @@ void rdesc_fill(int r, struct id *s, int mod) {
 
 }
 // 写回寄存器内容至内存
-//XXX:没用了
+//XXX:没用了/有点用
 void asm_write_back(int r) {
 	if ((rdesc[r].var != NULL) && rdesc[r].mod) {
 		if (rdesc[r].var->scope == 1) /* local var */
@@ -142,13 +142,18 @@ void asm_load(int r, struct id *s) {
 }
 // 为符号分配寄存器
 int reg_alloc(struct id *s) {
+	int r=reg_get();
+	asm_load(r, s);
+	rdesc_fill(r, s, UNMODIFIED);
+	return r;
+}
+
+int reg_get(){
 	int r;
 
 	/* empty register */
 	for (r = R_GEN; r < R_NUM; r++) {
 		if (rdesc[r].var == NULL) {
-			asm_load(r, s);
-			rdesc_fill(r, s, UNMODIFIED);
 			return r;
 		}
 	}
@@ -156,21 +161,16 @@ int reg_alloc(struct id *s) {
 	/* unmodifed register */
 	for (r = R_GEN; r < R_NUM; r++) {
 		if (!rdesc[r].mod) {
-			asm_load(r, s);
-			rdesc_fill(r, s, UNMODIFIED);
+
 			return r;
 		}
 	}
-
 	/* random register */
 	srand(time(NULL));
-	int random = (rand() % (R_NUM - R_GEN)) + R_GEN;
-	asm_write_back(random);
-	asm_load(random, s);
-	rdesc_fill(random, s, UNMODIFIED);
-	return random;
+	r = (rand() % (R_NUM - R_GEN)) + R_GEN;
+	asm_write_back(r);
+	return r;
 }
-
 // 寻找符号对应的最晚被修改的寄存器
 int reg_find(struct id *s) {
 	int first_appear;
