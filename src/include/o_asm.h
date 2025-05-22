@@ -21,6 +21,8 @@ void asm_stack_pivot(struct tac*code);
 void asm_call(struct tac*code,struct id *a, struct id *b);
 void asm_param(struct tac *code);
 void asm_return(struct id *a);
-void asm_load_var(struct id *a, const char *reg);//sw reg &a
+void asm_label(struct id *a);
+void asm_gvar(struct id *a);
+void asm_load_var(struct id *a, const char *reg); // sw reg &a
 void asm_store_var(struct id *a, const char *reg);//sw reg &a
 #endif	// ASM_GENERATOR_H

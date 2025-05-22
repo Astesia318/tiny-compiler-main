@@ -85,17 +85,7 @@ void asm_code(struct tac *code) {
 
 		case TAC_LABEL:
 			//for (int r = R_GEN; r < R_NUM; r++) asm_write_back(r);
-			for (int r = R_GEN; r < R_NUM; r++) rdesc_clear_all(r);
-			if(code->id_1->id_type==ID_LABEL){
-				input_str(obj_file, ".%s:\n", code->id_1->name);
-			}
-			else if(code->id_1->id_type==ID_FUNC){
-				input_str(obj_file, "	.align	2\n");
-				input_str(obj_file, "	.globl	%s\n", code->id_1->name);
-				input_str(obj_file, "	.type	%s,@function\n", code->id_1->name);
-				input_str(obj_file, "%s:\n", code->id_1->name);
-			}
-
+			asm_label(code->id_1);
 			return;
 
 		case TAC_ARG:
@@ -125,21 +115,14 @@ void asm_code(struct tac *code) {
 			return;
 
 		case TAC_VAR:
-			int data_size = TYPE_SIZE(code->id_1->data_type);
+			
 			if (scope)
 			{
 				LOCAL_VAR_OFFSET(code->id_1, tof);
 			}
 			else
-			{	
-				
-				code->id_1->scope = 0; /* global var */
-				input_str(obj_file, "	.globl	%s\n", code->id_1->name);
-				input_str(obj_file, "	.align	%d\n",TYPE_ALIGN(code->id_1->data_type));
-				input_str(obj_file, "	.type	%s,@object\n", code->id_1->name);
-				input_str(obj_file, "	.size %s, %d\n", code->id_1->name, data_size);
-				input_str(obj_file, "%s:\n", code->id_1->name);
-				input_str(obj_file, "	.zero	%d", data_size);//XXX:需要实现全局变量赋值后作改动
+			{
+				asm_gvar(code->id_1);
 			}
 			return;
 
@@ -195,7 +178,7 @@ void asm_tail() {
 }
 
 
-//TODO:没用了
+//XXX:没用了
 // 生成字符串数据段
 void asm_str(struct id *s) {
 	const char *t = s->name; /* The text */

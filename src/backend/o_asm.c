@@ -302,7 +302,30 @@ void asm_call(struct tac*code,struct id *a, struct id *b) {
 		rdesc_fill(R_a0,a,MODIFIED);
 	}
 }
+void asm_label(struct id *a){
+	for (int r = R_GEN; r < R_NUM; r++) rdesc_clear_all(r);
+	if(a->id_type==ID_LABEL){
+		input_str(obj_file, ".%s:\n", a->name);
+	}
+	else if(a->id_type==ID_FUNC){
+		input_str(obj_file, "	.align	2\n");
+		input_str(obj_file, "	.globl	%s\n", a->name);
+		input_str(obj_file, "	.type	%s,@function\n", a->name);
+		input_str(obj_file, "%s:\n", a->name);
+	}
+}
 
+void asm_gvar(struct id *a){
+	int data_size = TYPE_SIZE(a->data_type);
+	a->scope = 0; /* global var */
+	input_str(obj_file, "	.globl	%s\n", a->name);
+	input_str(obj_file, "	.bss\n");
+	input_str(obj_file, "	.align	%d\n",TYPE_ALIGN(a->data_type));
+	input_str(obj_file, "	.type	%s,@object\n", a->name);
+	input_str(obj_file, "	.size %s, %d\n", a->name, data_size);
+	input_str(obj_file, "%s:\n", a->name);
+	input_str(obj_file, "	.zero	%d", data_size);//XXX:需要实现全局变量赋值后作改动
+}
 // 生成函数返回对应的汇编代码
 void asm_return(struct id *a) {
 	//for (int r = R_GEN; r < R_NUM; r++) asm_write_back(r);
