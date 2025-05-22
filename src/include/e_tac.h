@@ -42,6 +42,7 @@
 #define DATA_LONG 1	   // 长整型
 #define DATA_FLOAT 2   // 浮点型
 #define DATA_DOUBLE 3  // 双精度浮点型
+#define DATA_CHAR 4	   // 单字符型
 
 // 三地址码类型
 #define TAC_UNDEF -1	   // 未定义
@@ -96,6 +97,7 @@ struct id {
 	union {
 		int num_int;
 		double num_float;
+		char num_char;
 	} num;
 	int id_type;
 	int data_type;	// control the type of 'num'

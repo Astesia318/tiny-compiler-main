@@ -59,6 +59,50 @@ extern const char *args_name[];
 		latest_appear = RDESC_NUM(rdesc[latest_appear].next); \
 	}
 
+#define DATA_ALIGN 4
+
+#define WORD 4
+#define HWORD 2
+#define BYTE 1
+
+#define TYPE_SIZE(data_type) ( \
+    (data_type) == DATA_INT    ? 4 : \
+    (data_type) == DATA_LONG   ? 4 : \
+    (data_type) == DATA_FLOAT  ? 4 : \
+    (data_type) == DATA_CHAR   ? 1 : \
+    (data_type) == DATA_DOUBLE ? 8 : \
+    -1 /* 或者返回一个错误码，比如 -1, 或者 ((void)0) 引发编译错误 */ \
+)
+#define TYPE_ALIGN(data_type) ( \
+    (data_type) == DATA_INT    ? 2 : \
+    (data_type) == DATA_LONG   ? 2 : \
+    (data_type) == DATA_FLOAT  ? 2 : \
+    (data_type) == DATA_CHAR   ? 1 : \
+    (data_type) == DATA_DOUBLE ? 3 : \
+    -1 /* 或者返回一个错误码，比如 -1, 或者 ((void)0) 引发编译错误 */ \
+)
+#define max(a,b) (a>b?a:b)
+#define ALIGN(data_size) (max(DATA_ALIGN,data_size))
+#define STORE_OP(data_size) ( \
+    (data_size) == WORD    ? "sw" : \
+    (data_size) == HWORD   ? "sh" : \
+    (data_size) == BYTE    ? "sb" : \
+    ""  \
+)
+#define LOAD_OP(data_size) ( \
+    (data_size) == WORD    ? "lw" : \
+    (data_size) == HWORD   ? "lhu" : \
+    (data_size) == BYTE    ? "lbu" : \
+    ""  \
+)
+#define LOCAL_VAR_OFFSET(identifier, _offset)  \
+	do{	\
+		int data_size = TYPE_SIZE(identifier->data_type);	\
+		identifier->scope = 1;	\
+		identifier->offset = _offset-data_size;	\
+		_offset-=ALIGN(data_size);	\
+	}while(0)
+
 // 函数声明
 void rdesc_clear_all(int r);
 void rdesc_clear_prev(int r);

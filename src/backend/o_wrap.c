@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <time.h>
 
 #include "e_tac.h"
@@ -14,66 +15,6 @@ int tos; /* top of static */
 int tof; /* top of frame */
 int oof; /* offset of formal */
 int oon; /* offset of next frame */
-
-// 生成开始段
-void asm_head() {
-	char head[] =
-		"	# head\n"
-		"	.text\n";
-	input_str(obj_file, "%s", head);
-}
-
-// 生成结束段
-void asm_tail() {
-	char tail[] =
-		"\n	# tail\n"
-		"	.ident \"tiny-compiler\"\n";
-
-	input_str(obj_file, "%s", tail);
-}
-
-
-//TODO:
-// 生成字符串数据段
-void asm_str(struct id *s) {
-	const char *t = s->name; /* The text */
-	int i;
-
-	input_str(obj_file, "L%u:\n", s->label); /* Label for the string */
-	input_str(obj_file, "	DBS ");			 /* Label for the string */
-
-	for (i = 1; t[i + 1] != 0; i++) {
-		if (t[i] == '\\') {
-			switch (t[++i]) {
-				case 'n':
-					input_str(obj_file, "%u,", '\n');
-					break;
-
-				case '\"':
-					input_str(obj_file, "%u,", '\"');
-					break;
-			}
-		} else
-			input_str(obj_file, "%u,", t[i]);
-	}
-
-	input_str(obj_file, "0\n"); /* End of string */
-}
-
-// 生成静态数据段
-void asm_static(void) {
-	int i;
-
-	struct id *sl;
-
-	for (sl = id_global; sl != NULL; sl = sl->next) {
-		if (sl->id_type == ID_STRING) asm_str(sl);
-	}
-
-	input_str(obj_file, "STATIC:\n");
-	input_str(obj_file, "	DBN 0,%u\n", tos);
-	input_str(obj_file, "STACK:\n");
-}
 
 // 根据单条三地址码，生成汇编代码
 void asm_code(struct tac *code) {
@@ -184,19 +125,21 @@ void asm_code(struct tac *code) {
 			return;
 
 		case TAC_VAR:
-			if (scope) {
-				code->id_1->scope = 1; /* local var */
-				code->id_1->offset = tof;
-				tof -= 4;
-			} else {
+			int data_size = TYPE_SIZE(code->id_1->data_type);
+			if (scope)
+			{
+				LOCAL_VAR_OFFSET(code->id_1, tof);
+			}
+			else
+			{	
+				
 				code->id_1->scope = 0; /* global var */
 				input_str(obj_file, "	.globl	%s\n", code->id_1->name);
-				input_str(obj_file, "	.align	2\n");//XXX:增加数据类型后需要改动,下方同
+				input_str(obj_file, "	.align	%d\n",TYPE_ALIGN(code->id_1->data_type));
 				input_str(obj_file, "	.type	%s,@object\n", code->id_1->name);
-				input_str(obj_file, "	.size %s, 4\n", code->id_1->name);//XXX:
+				input_str(obj_file, "	.size %s, %d\n", code->id_1->name, data_size);
 				input_str(obj_file, "%s:\n", code->id_1->name);
-				input_str(obj_file, "	.zero	4");//XXX:
-
+				input_str(obj_file, "	.zero	%d", data_size);//XXX:需要实现全局变量赋值后作改动
 			}
 			return;
 
@@ -233,3 +176,65 @@ void tac_to_obj() {
 	asm_tail();
 	// asm_static();
 }
+
+// 生成开始段
+void asm_head() {
+	char head[] =
+		"	# head\n"
+		"	.text\n";
+	input_str(obj_file, "%s", head);
+}
+
+// 生成结束段
+void asm_tail() {
+	char tail[] =
+		"\n	# tail\n"
+		"	.ident \"tiny-compiler\"\n";
+
+	input_str(obj_file, "%s", tail);
+}
+
+
+//TODO:没用了
+// 生成字符串数据段
+void asm_str(struct id *s) {
+	const char *t = s->name; /* The text */
+	int i;
+
+	input_str(obj_file, "L%u:\n", s->label); /* Label for the string */
+	input_str(obj_file, "	DBS ");			 /* Label for the string */
+
+	for (i = 1; t[i + 1] != 0; i++) {
+		if (t[i] == '\\') {
+			switch (t[++i]) {
+				case 'n':
+					input_str(obj_file, "%u,", '\n');
+					break;
+
+				case '\"':
+					input_str(obj_file, "%u,", '\"');
+					break;
+			}
+		} else
+			input_str(obj_file, "%u,", t[i]);
+	}
+
+	input_str(obj_file, "0\n"); /* End of string */
+}
+
+// 生成静态数据段
+//XXX:没用了
+void asm_static(void) {
+	int i;
+
+	struct id *sl;
+
+	for (sl = id_global; sl != NULL; sl = sl->next) {
+		if (sl->id_type == ID_STRING) asm_str(sl);
+	}
+
+	input_str(obj_file, "STATIC:\n");
+	input_str(obj_file, "	DBN 0,%u\n", tos);
+	input_str(obj_file, "STACK:\n");
+}
+

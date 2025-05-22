@@ -10,6 +10,7 @@ extern int tof;	 // 栈帧偏移
 extern int oof;	 // 参数偏移
 extern int oon;	 // 临时偏移
 
+
 // 函数声明
 void asm_bin(char *op, struct id *a, struct id *b, struct id *c);
 // hjj

@@ -82,6 +82,7 @@ void rdesc_fill(int r, struct id *s, int mod) {
 
 }
 // 写回寄存器内容至内存
+//XXX:没用了
 void asm_write_back(int r) {
 	if ((rdesc[r].var != NULL) && rdesc[r].mod) {
 		if (rdesc[r].var->scope == 1) /* local var */
@@ -128,7 +129,7 @@ void asm_load(int r, struct id *s) {
 				input_str(obj_file, "	la a5,%s\n", s->name);
 				input_str(obj_file, "	lw %s,0(a5)\n",reg_name[r]);
 			} else {
-				input_str(obj_file, "	lw %s,%d(s0)\n", reg_name[r],s->offset);
+				input_str(obj_file, "	%s %s,%d(s0)\n",LOAD_OP(TYPE_SIZE(s->data_type)), reg_name[r],s->offset);
 			}
 			break;
 		//TODO:	

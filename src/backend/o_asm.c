@@ -241,10 +241,10 @@ void asm_stack_pivot(struct tac* code){
 	struct tac *cur;
 	for (cur = code; cur != NULL; cur = cur->next) {
 		if(cur->type==TAC_VAR){
-			var_size += 4;
+			var_size += ALIGN(TYPE_SIZE(cur->id_1->data_type));
 		}
 		else if(cur->type==TAC_PARAM){
-			param_size += 4;
+			param_size += ALIGN(TYPE_SIZE(cur->id_1->data_type));
 		}
 		else if(cur->type==TAC_END){
 			break;
@@ -253,8 +253,8 @@ void asm_stack_pivot(struct tac* code){
 	var_size = (var_size + 15) / 16*16;
 	param_size = (param_size + 15) / 16*16;
 	oon = var_size + param_size + 16;
-	tof = LOCAL_OFF-4;
-	oof = FORMAL_OFF-var_size-4;
+	tof = LOCAL_OFF;
+	oof = FORMAL_OFF-var_size;
 	input_str(obj_file, "	addi sp,sp,-%d\n", oon);
 	input_str(obj_file, "	sw ra,%d(sp)\n",oon-4);
 	input_str(obj_file, "	sw s0,%d(sp)\n",oon-8);
@@ -263,12 +263,11 @@ void asm_stack_pivot(struct tac* code){
 void asm_param(struct tac*code){
 	int cnt = 0;
 	struct tac *cur = code->next;
+	int data_size;
 	while (cur->type == TAC_PARAM)
 	{
-		cur->id_1->scope = 1; /* parameter is special local var */
-		cur->id_1->offset = oof;
-		oof -= 4;
-		//TODO:
+		LOCAL_VAR_OFFSET(cur->id_1, oof);
+		// TODO:
 		asm_store_var(cur->id_1, args_name[cnt]);
 		cur = cur->next;
 		cnt++;
@@ -328,17 +327,17 @@ void asm_load_var(struct id *s,const char *r) {
 	}
 	else if (s->scope == GLOBAL_TABLE) {
 		input_str(obj_file, "	la a5,%s\n", s->name);
-		input_str(obj_file, "	lw %s,0(a5)\n",r);
+		input_str(obj_file, "	%s %s,0(a5)\n",LOAD_OP(TYPE_SIZE(s->data_type)),r);
 	} 
 	else {
-		input_str(obj_file, "	lw %s,%d(s0)\n", r,s->offset);
+		input_str(obj_file, "	%s %s,%d(s0)\n",LOAD_OP(TYPE_SIZE(s->data_type)), r,s->offset);
 	}
 }
 void asm_store_var(struct id *s,const char *r) {
 	if (s->scope == GLOBAL_TABLE) {
 		input_str(obj_file, "	la a4,%s\n", s->name);
-		input_str(obj_file, "	sw %s,0(a4)\n",r);
+		input_str(obj_file, "	%s %s,0(a4)\n",STORE_OP(TYPE_SIZE(s->data_type)),r);
 	} else {
-		input_str(obj_file, "	sw %s,%d(s0)\n", r,s->offset);
+		input_str(obj_file, "	%s %s,%d(s0)\n",STORE_OP(TYPE_SIZE(s->data_type)), r,s->offset);
 	}
 }

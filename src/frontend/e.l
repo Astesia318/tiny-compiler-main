@@ -18,6 +18,8 @@
 
 "double"  {  return DOUBLE;  }
 
+"char"	{  return CHAR;  }
+
 "input"  {  return INPUT;  }
 
 "output"  {  return OUTPUT;  }
@@ -50,7 +52,12 @@
 
 [0-9]+\.[0-9]+  {  yylval.num_float = strtod(yytext,NULL); return NUM_FLOAT;  }
 
-\"[^\"]*\" {  yylval.string = strdup(yytext); return TEXT;  }
+\'[^\']\' {  yylval.num_char = strdup(yytext)[1]; printf("%c",yylval.num_char);return NUM_CHAR;  }
+
+\"[^\"]*\" {  yylval.string = strdup(yytext); printf("%s",yylval.string);return TEXT;  }
+
+
+
 
 "++"  {  return INC; }
 

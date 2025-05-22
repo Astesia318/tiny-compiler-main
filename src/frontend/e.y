@@ -23,17 +23,20 @@ void yyerror(char* msg);
     char* string;
     int num_int;
     double num_float;
+    char num_char;
     int type;
 }
 
 %token <name> IDENTIFIER
 %token <num_int> NUM_INT
 %token <num_float> NUM_FLOAT
+%token <num_char> NUM_CHAR
 %token <string> TEXT
 %token <type> INT
 %token <type> LONG
 %token <type> FLOAT
 %token <type> DOUBLE
+%token <type> CHAR
 %type <operation> program
 %type <operation> function_declaration_list
 %type <operation> function_declaration
@@ -426,6 +429,10 @@ expression : inc_expression
                             {
                                 $$ = process_float($1);
                             }
+| NUM_CHAR          
+                            {
+                                $$ = process_char($1);
+                            }
 | IDENTIFIER                            
                             {
                                 $$ = process_identifier($1);
@@ -477,6 +484,10 @@ data_type : INT
 | DOUBLE
                             {
                                 $$ = DATA_DOUBLE;
+                            }
+| CHAR                      
+                            {
+                                $$ = DATA_CHAR;
                             }
 
 %%

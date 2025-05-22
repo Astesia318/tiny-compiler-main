@@ -5,11 +5,12 @@
 #include <string.h>
 
 int scope;
-
+char temp_buf[256];
 struct id *id_global, *id_local;
 static int temp_amount;
 static int label_amount;
-
+//lyc:增加受检查id的type，以处理字符常量与变量名之间的误判/不加了
+//check exist时为寻找标识符，not exist时需要判断同名是否同类型
 static struct id *_find_identifier(const char *name, struct id **id_table,
 								   int check) {
 	int has_finded = 0;
@@ -17,7 +18,7 @@ static struct id *_find_identifier(const char *name, struct id **id_table,
 	struct id *cur = *id_table;
 
 	while (cur) {
-		if (cur->name && !strcmp(name, cur->name)) {
+		if (cur->name && !strcmp(name, cur->name) &&(check==CHECK_ID_NOT_EXIST || cur->id_type==ID_VAR)) {//check exist时找到的必须是var
 			has_finded = 1;
 			id_wanted = cur;
 			break;
@@ -55,16 +56,19 @@ static struct id *_add_identifier(const char *name, int id_type, int data_type,
 	struct id *id_wanted;
 
 	struct id *id_collision = _collide_identifier(name, id_type);
-	if (id_collision) {
-		if (ID_IS_CONST(id_collision)) {
+	if (id_collision) {//表内有同名id
+		if (ID_IS_CONST(id_collision)) {//表中已有同名常量id，返回
 			return id_collision;
-		} else {
+		} 
+		else if(id_type!=ID_NUM){
+								//表中同名不是常量id，错误
 			perror("identifier declared");
 			printf("add name: %s\n", name);
 			return NULL;
 		}
+		//字符常量与标识符名冲突，正常添加XXX:会添加多个相同常量
 	}
-
+	//没有冲突，向表内添加
 	MALLOC_AND_SET_ZERO(id_wanted, 1, struct id);
 	char *id_name = (char *)malloc(sizeof(char) * strlen(name));
 	strcpy(id_name, name);
@@ -222,8 +226,12 @@ const char *id_to_str(struct id *id) {
 	if (id == NULL) return "NULL";
 
 	switch (id->id_type) {
-		case ID_VAR:
 		case ID_NUM:
+			if(id->data_type==DATA_CHAR){
+				sprintf(temp_buf, "\'%s\'", id->name);
+				return temp_buf;
+			}
+		case ID_VAR:
 		case ID_FUNC:
 		case ID_TEMP:
 		case ID_LABEL:
@@ -248,7 +256,8 @@ const char *data_to_str(int type) {
 			return "float";
 		case DATA_DOUBLE:
 			return "double";
-
+		case DATA_CHAR:
+			return "char";
 		default:
 			perror("unknown data type");
 			printf("id type: %d\n", type);

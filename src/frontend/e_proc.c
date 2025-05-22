@@ -76,6 +76,17 @@ struct op *process_float(double floatnum) {
 	return float_exp;
 }
 
+struct op *process_char(char character){
+	struct op *char_exp = new_op();
+
+	BUF_ALLOC(buf);
+	sprintf(buf, "%c", character);
+	struct id *var = add_identifier(buf, ID_NUM, DATA_CHAR);
+	var->num.num_char = character;
+	char_exp->addr = var;
+
+	return char_exp;
+}
 // 分配标识符
 struct op *process_identifier(char *name) {
 	struct op *id_exp = new_op();

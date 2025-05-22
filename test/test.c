@@ -1,18 +1,12 @@
-int g;
-int alongname;
-int fib(int a)
-{
-    if(a<=2){
-        return 1;
-    }
-    return fib(a - 1) + fib(a - 2);
-}
+char global;
 int main()
 {
-    int a,b, g;
-    a = 1;
-    b = 3;
-    g = fib(10);
-    a = g;
+    char a;
+    int b;
+    long c;
+    global = 'c';
+    a = 'b';
+    
+    c = 45;
     return 0;
 }
