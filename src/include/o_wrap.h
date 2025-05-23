@@ -11,5 +11,5 @@ void asm_code(struct tac *code);
 void asm_head();
 void asm_tail();
 void asm_static(void);
-void asm_str(struct id *s);
+void asm_lc(struct id *s);
 #endif	// CODE_GENERATOR_H

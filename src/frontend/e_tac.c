@@ -9,8 +9,9 @@ char temp_buf[256];
 struct id *id_global, *id_local;
 static int temp_amount;
 static int label_amount;
-//lyc:增加受检查id的type，以处理字符常量与变量名之间的误判/不加了
-//check exist时为寻找标识符，not exist时需要判断同名是否同类型
+static int lc_amount;
+// lyc:增加受检查id的type，以处理字符常量与变量名之间的误判/不加了
+// check exist时为寻找标识符，not exist时需要判断同名是否同类型
 static struct id *_find_identifier(const char *name, struct id **id_table,
 								   int check) {
 	int has_finded = 0;
@@ -78,8 +79,8 @@ static struct id *_add_identifier(const char *name, int id_type, int data_type,
 	id_wanted->next = *id_table;
 	*id_table = id_wanted;
 	id_wanted->offset = -1; /* Unset address */
-	if (id_type == ID_STRING) {
-		id_wanted->label = label_amount++;
+	if (ID_IS_GCONST(id_type,data_type)) {
+		id_wanted->label = lc_amount++;
 	}
 
 	return id_wanted;
@@ -101,7 +102,8 @@ struct id *find_func(const char *name) {
 }
 
 struct id *add_identifier(const char *name, int id_type, int data_type) {
-	if (id_type == ID_STRING)
+	//lyc:对于text float double类型常量将其放到全局表里
+	if (ID_IS_GCONST(id_type,data_type))
 		return _add_identifier(name, id_type, data_type,
 							   _choose_id_table(GLOBAL_TABLE));
 	else
@@ -114,6 +116,7 @@ void init_tac() {
 	id_global = NULL;
 	id_local = NULL;
 	temp_amount = 1;
+	lc_amount = 0;
 	label_amount = 1;
 }
 

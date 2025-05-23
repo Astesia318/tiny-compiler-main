@@ -1,12 +1,16 @@
-char global;
+int global;
+int func(int a)
+{
+    return a;
+}
+int globallll;
 int main()
 {
-    char a;
-    int b;
-    long c;
-
-    a = 'b';
-    global = a;
-    c = a+global;
+    double b;
+    float c;
+    
+    c = 1.5;
+    b = 1.5;
+    c = b;
     return 0;
 }

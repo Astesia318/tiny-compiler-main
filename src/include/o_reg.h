@@ -73,7 +73,9 @@ extern const char *args_name[];
     (data_type) == DATA_DOUBLE ? 8 : \
     -1 /* 或者返回一个错误码，比如 -1, 或者 ((void)0) 引发编译错误 */ \
 )
+//XXX:这里认为no_data是string
 #define TYPE_ALIGN(data_type) ( \
+    (data_type) == NO_DATA     ? 2 : \
     (data_type) == DATA_INT    ? 2 : \
     (data_type) == DATA_LONG   ? 2 : \
     (data_type) == DATA_FLOAT  ? 2 : \

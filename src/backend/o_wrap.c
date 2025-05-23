@@ -155,7 +155,11 @@ void tac_to_obj() {
 		// input_str(obj_file, "\n");
 		asm_code(cur);
 	}
-
+	for (struct id *gconst = id_global; gconst != NULL;gconst=gconst->next){
+		if(ID_IS_GCONST(gconst->id_type,gconst->data_type)){
+			asm_lc(gconst);
+		}
+	}
 	asm_tail();
 	// asm_static();
 }
@@ -178,31 +182,25 @@ void asm_tail() {
 }
 
 
-//XXX:没用了
+//XXX:没用了/有点用
 // 生成字符串数据段
-void asm_str(struct id *s) {
+void asm_lc(struct id *s) {
 	const char *t = s->name; /* The text */
 	int i;
-
-	input_str(obj_file, "L%u:\n", s->label); /* Label for the string */
-	input_str(obj_file, "	DBS ");			 /* Label for the string */
-
-	for (i = 1; t[i + 1] != 0; i++) {
-		if (t[i] == '\\') {
-			switch (t[++i]) {
-				case 'n':
-					input_str(obj_file, "%u,", '\n');
-					break;
-
-				case '\"':
-					input_str(obj_file, "%u,", '\"');
-					break;
-			}
-		} else
-			input_str(obj_file, "%u,", t[i]);
+	input_str(obj_file, "	.section	.rodata\n");
+	input_str(obj_file, "	.align	%d\n", TYPE_ALIGN(s->data_type));
+	input_str(obj_file, ".LC%u:\n", s->label); /* Label for the string */
+	if(s->id_type==ID_STRING){
+		input_str(obj_file, "	.string	\"%s\"\n", s->name);
 	}
-
-	input_str(obj_file, "0\n"); /* End of string */
+	else {
+		for (int i = TYPE_SIZE(DATA_DOUBLE) - TYPE_SIZE(s->data_type); i < TYPE_SIZE(DATA_DOUBLE); i += TYPE_SIZE(DATA_FLOAT))
+		{
+			int temp;
+			memcpy(&temp, (void*)(&s->num)+i, TYPE_SIZE(DATA_FLOAT));
+			input_str(obj_file, "	.word	%d\n", temp);
+		}
+	}
 }
 
 // 生成静态数据段
@@ -212,9 +210,9 @@ void asm_static(void) {
 
 	struct id *sl;
 
-	for (sl = id_global; sl != NULL; sl = sl->next) {
-		if (sl->id_type == ID_STRING) asm_str(sl);
-	}
+	// for (sl = id_global; sl != NULL; sl = sl->next) {
+	// 	if (sl->id_type == ID_STRING) asm_str(sl);
+	// }
 
 	input_str(obj_file, "STATIC:\n");
 	input_str(obj_file, "	DBN 0,%u\n", tos);
