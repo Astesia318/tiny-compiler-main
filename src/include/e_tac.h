@@ -27,6 +27,9 @@
 #define CHECK_ID_NOT_EXIST 0
 #define CHECK_ID_EXIST 1
 
+// 类型检查中两操作数是否是赋值关系
+#define IS_NOT_ASSIGN 0
+#define IS_ASSIGN 1
 // 符号类型
 #define NO_TYPE -1	 // 无类型
 #define ID_VAR 0	 // 变量
@@ -89,7 +92,14 @@
 	pointer = (type *)malloc((amount) * sizeof(type)); \
 	memset(pointer, 0, (amount) * sizeof(type));
 
-#define TAC_IS_CMP(cal) (cal>=TAC_EQ && cal<=TAC_GE)
+#define NEW_BUILT_IN_FUNC_ID(identifier, func_name, type) \
+	MALLOC_AND_SET_ZERO(identifier, 1, struct id);   \
+	identifier->name = func_name;                    \
+	identifier->id_type = ID_FUNC;                   \
+	identifier->data_type = type;                    \
+	identifier->offset = -1;
+
+#define TAC_IS_CMP(cal) (cal >= TAC_EQ && cal <= TAC_GE)
 #define ID_IS_CONST(id) (id->id_type == ID_NUM || id->id_type == ID_STRING)
 #define ID_IS_GCONST(id_type,data_type) (id_type ==ID_STRING || id_type == ID_NUM && (data_type == DATA_FLOAT || data_type == DATA_DOUBLE))
 #define TAC_TO_FUNC(cal) (	\
@@ -105,6 +115,11 @@
 	cal==TAC_GE? "__gesf2" :	\
 	""	\
 )
+#define TYPE_CHECK(id1,id2)   \
+    (id1->data_type==id2->data_type) || \
+	(id1->data_type==DATA_CHAR && id2->data_type==DATA_INT) || \
+	(id1->data_type==DATA_INT && id2->data_type==DATA_CHAR)
+
 // 符号
 struct id
 {

@@ -11,25 +11,13 @@ float main()
     float y;
     float z;
     int a;
-    a = 0;
+    char c;
     x = 2.6;
     y = 3.4;
-    z = x + 2.1;
-    z = x - 2.1;
-    z = x * 2.1;
-    z = x / 2.1;
-    z = x < 2.1;
-    z = x > 2.1;
-    z = x >= 2.1;
-    z = x <= 2.1;
-    z = x == 2.1;
-    z = x != 2.1;
-    if(a==1){
-        x = a;
-        a = x;
-    }
-    else{
-        a = 1;
-    }
+    a = x+y;//f2i
+    a = func(a);//i2f f2i
+    c = a;
+    a = c;  
+    c = x;
     return z;
 }

@@ -52,7 +52,7 @@ void asm_code(struct tac *code) {
 
 		case TAC_ASSIGN:
 			r = reg_find(code->id_2);
-			rdesc_fill(r, code->id_1, MODIFIED);
+			if(code->id_1->data_type==code->id_2->data_type)rdesc_fill(r, code->id_1, MODIFIED);//只有类型相同时覆盖寄存器描述符，防止未截断错误
 			asm_store_var(code->id_1, reg_name[r]);
 			return;
 

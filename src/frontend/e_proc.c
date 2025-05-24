@@ -10,26 +10,69 @@ struct tac *tac_head;
 static struct tac *arg_list_head;
 static struct block *block_top;
 
+struct op *type_casting(struct id *id_remain, struct id *id_casting){
+	struct op *cast_exp = new_op();
+	
+	int type_target = id_remain->data_type;
+	int type_src = id_casting->data_type;
+
+	struct id *t = new_temp(type_target);	// 分配临时变量
+	cast_exp->addr = t;
+
+
+	char casting_func[16];
+	sprintf(casting_func, "__%s%s%s",
+			type_target == DATA_CHAR ? "fixuns" : 
+			type_target == DATA_INT ? "fix": 
+			type_target == DATA_FLOAT ? "float": ""
+			,
+			type_src == DATA_CHAR ? "unsi" : 
+			type_src == DATA_INT ? "si": 
+			type_src == DATA_FLOAT ? "sf": ""
+			,
+			type_target == DATA_CHAR ? "si" : 
+			type_target == DATA_INT ? "si": 
+			type_target == DATA_FLOAT ? "sf": ""
+		);
+	struct id *func;
+	NEW_BUILT_IN_FUNC_ID(func, casting_func, type_target);
+	cat_tac(cast_exp, NEW_TAC_1(TAC_ARG, id_casting)); // 生成 arg a
+	cat_tac(cast_exp, NEW_TAC_2(TAC_CALL, t, func));   // 生成 t1=call func
+	return cast_exp;
+}
 /*****expression*****/
 // 处理形如"a=a op b"的表达式
 struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 	struct op *exp = new_op();
 
-	struct id *t = new_temp(exp_l->addr->data_type);	// 分配临时变量
-	exp->addr = t;
 	struct id *exp_l_addr = exp_l->addr;
 	struct id *exp_r_addr = exp_r->addr;
 
-	if (exp_l_addr->data_type != exp_r_addr->data_type) {
-		perror("wrong type");
-	}
+	struct id *t = new_temp(exp_l->addr->data_type);	// 分配临时变量
+	exp->addr = t;
 	cat_tac(exp, NEW_TAC_1(TAC_VAR, t));
 	cat_op(exp, exp_l);	 // 拼接exp和exp_l的code
 	cat_op(exp, exp_r);	 // 拼接exp和exp_r的code
-	
+
 	if (exp_l_addr->data_type == DATA_FLOAT || exp_r_addr->data_type == DATA_FLOAT) {
 		// 对于浮点数的运算，生成调用内部函数的三地址码
-		struct id *func = add_identifier(TAC_TO_FUNC(cal), ID_FUNC, DATA_FLOAT);
+
+		if(TYPE_CHECK(exp_l_addr,exp_r_addr)==0){
+			if(exp_l_addr->data_type==DATA_FLOAT){
+				struct op *cast_exp = type_casting(exp_l_addr, exp_r_addr);
+				exp_r_addr =cast_exp->addr;
+				cat_op(exp, cast_exp);
+			}
+			else if(exp_r_addr->data_type==DATA_FLOAT){
+				struct op *cast_exp = type_casting(exp_r_addr, exp_l_addr);
+				exp_l_addr =cast_exp->addr;
+				cat_op(exp, cast_exp);
+			}	
+		}
+		struct id *func;
+
+		NEW_BUILT_IN_FUNC_ID(func, TAC_TO_FUNC(cal), DATA_FLOAT);
+
 		cat_tac(exp, NEW_TAC_1(TAC_ARG, exp_r_addr)); // 生成 arg b
 		cat_tac(exp, NEW_TAC_1(TAC_ARG, exp_l_addr)); // 生成 arg a
 		cat_tac(exp, NEW_TAC_2(TAC_CALL, t, func));   // 生成 t1=call func
@@ -460,14 +503,14 @@ struct op *process_assign(char *name, struct op *exp) {
 	struct id *var = find_identifier(name);
 	struct id *exp_temp = exp->addr;
 	assign_stat->addr = exp_temp;
-
-	if (var->data_type != exp_temp->data_type) {
-		perror("wrong type");
-		printf("var type: %d\tvar name: %s\n", var->data_type, var->name);
-		printf("exp type: %d\texp name: %s\n", exp_temp->data_type,
-			   exp_temp->name);
-	}
+	
 	cat_op(assign_stat, exp);
+	if(TYPE_CHECK(var,exp_temp)==0){
+		struct op *cast_exp = type_casting(var, exp_temp);
+		exp_temp =cast_exp->addr;
+		cat_op(assign_stat, cast_exp);
+	}
+
 	cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, var, exp_temp));
 
 	return assign_stat;
@@ -532,3 +575,5 @@ struct op *process_parameter_list(struct op *param_list_pre, int data_type,
 
 	return parameter_list;
 }
+
+
