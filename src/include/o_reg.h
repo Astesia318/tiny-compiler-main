@@ -105,6 +105,23 @@ extern const char *args_name[];
 		_offset-=ALIGN(data_size);	\
 	}while(0)
 
+#define OP_TO_CAL(op,a,b) (    \
+    strcmp(op,"add")==0 ? a+b : \
+    strcmp(op,"sub")==0 ? a-b : \
+    strcmp(op,"mul")==0 ? a*b : \
+    strcmp(op,"div")==0 ? a/b : \
+    -1 \
+)
+#define OP_TO_CMP(op,a,b) ( \
+    op==TAC_EQ  ? a==b : \
+    op==TAC_NE  ? a!=b : \
+    op==TAC_LT  ? a<b : \
+    op==TAC_LE  ? a<b : \
+    op==TAC_GT  ? a>=b : \
+    op==TAC_GE  ? a<=b : \
+    -1  \
+)
+
 // 函数声明
 void rdesc_clear_all(int r);
 void rdesc_clear_prev(int r);

@@ -7,6 +7,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "riscv.h"
 #include "e_tac.h"
 
 // 生成二元运算对应的汇编代码
@@ -14,20 +15,7 @@
 void asm_bin(char *op, struct id *a, struct id *b, struct id *c) {
 	//bc都是立即数,直接计算
 	if(b->id_type==ID_NUM&&c->id_type==ID_NUM){
-		switch (op[0]) {
-			case 'a'://add
-				input_str(obj_file, "	li a5,%d\n", b->num.num_int + c->num.num_int);
-				break;
-			case 's'://sub
-				input_str(obj_file, "	li a5,%d\n", b->num.num_int - c->num.num_int);
-				break;
-			case 'm'://mul
-				input_str(obj_file, "	li a5,%d\n", b->num.num_int * c->num.num_int);
-				break;
-			case 'd'://div
-				input_str(obj_file, "	li a5,%d\n", b->num.num_int / c->num.num_int);
-				break;
-		}
+		U_TYPE_UPPER_IMM("li", reg_name[R_a5], OP_TO_CAL(op, b->num.num_int, c->num.num_int)); // li rd, imm
 	}
 	//bc其中一个不是立即数
 	else {
@@ -50,7 +38,7 @@ void asm_bin(char *op, struct id *a, struct id *b, struct id *c) {
 				break;
 			case 'm'://mul，XXX:选择将立即数储存到寄存器计算，但是gcc对于某些特殊用例是通过移位计算的
 			case 'd'://div,XXX:选择将立即数储存到寄存器计算，但是gcc对于某些特殊用例是通过移位计算的
-				while (reg_b == reg_c) {//c为立即数时可以使用addi处理
+				while (reg_b == reg_c) {
 					reg_b = reg_find(b);
 					reg_c = reg_find(c);
 					if(b==c)break;
@@ -88,37 +76,9 @@ void asm_cmp(int op, struct id *a, struct id *b, struct id *c) {
 	int res_reg = R_a5;
 	if (b->id_type == ID_NUM && c->id_type == ID_NUM)
 	{
-		switch (op) {
-			case TAC_EQ:
-				b->num.num_int == c->num.num_int ? 
-					input_str(obj_file, "	li %s,1\n", reg_name[res_reg]):
-					(res_reg=R_zero);
-				break;
-			case TAC_NE:
-				b->num.num_int != c->num.num_int ? 
-					input_str(obj_file, "	li %s,1\n", reg_name[res_reg]):
-					(res_reg=R_zero);
-			case TAC_LT:
-				b->num.num_int < c->num.num_int ? 
-					input_str(obj_file, "	li %s,1\n", reg_name[res_reg]):
-					(res_reg=R_zero);
-				break;
-			case TAC_LE:
-				b->num.num_int <= c->num.num_int ? 
-					input_str(obj_file, "	li %s,1\n", reg_name[res_reg]):
-					(res_reg=R_zero);
-				break;
-			case TAC_GT:
-				b->num.num_int > c->num.num_int ? 
-					input_str(obj_file, "	li %s,1\n", reg_name[res_reg]):
-					(res_reg=R_zero);
-				break;
-			case TAC_GE:
-				b->num.num_int >= c->num.num_int ? 
-					input_str(obj_file, "	li %s,1\n", reg_name[res_reg]):
-					(res_reg=R_zero);
-				break;
-			}
+		OP_TO_CMP(op, b->num.num_int, c->num.num_int) ? 
+			U_TYPE_UPPER_IMM("li", reg_name[res_reg], 1) : //li rd,1
+			(res_reg = R_zero);
 	}
 	//bc其中一个不是立即数
 	else {
@@ -128,37 +88,42 @@ void asm_cmp(int op, struct id *a, struct id *b, struct id *c) {
 			if(b->id_type!=ID_NUM)reg_b = reg_find(b);
 			if(c->id_type!=ID_NUM)reg_c = reg_find(c);
 		}
-		if(reg_b!=-1&&reg_c!=-1){
+		const char *b_n = reg_name[reg_b];
+		const char *c_n = reg_name[reg_c];
+		const char *res_n = reg_name[res_reg];
+
+		if (reg_b != -1 && reg_c != -1) {
 			switch (op) {
-                case TAC_EQ: // a5 == a4  => sub a5, a5, a4; seqz a5, a5
-                    input_str(obj_file, "    sub %s,%s,%s\n", reg_name[res_reg], reg_name[reg_b], reg_name[reg_c]);
-                    input_str(obj_file, "    seqz %s,%s\n", reg_name[res_reg], reg_name[res_reg]);
-                    break;
-                case TAC_NE: // a5 != a4  => sub a5, a5, a4; snez a5, a5
-                    input_str(obj_file, "    sub %s,%s,%s\n", reg_name[res_reg], reg_name[reg_b], reg_name[reg_c]);
-                    input_str(obj_file, "    snez %s,%s\n", reg_name[res_reg], reg_name[res_reg]);
-                    break;
-				case TAC_LT: // a5 < a4   => slt a5, a5, a4
-					input_str(obj_file, "    slt %s,%s,%s\n", reg_name[res_reg], reg_name[reg_b], reg_name[reg_c]);
+				case TAC_EQ: // a5 == a4  => sub a5, a5, a4; seqz a5, a5
+					R_TYPE("sub", res_n, b_n, c_n);
+					PSEUDO_2_REG("seqz", res_n, res_n);
 					break;
-                case TAC_LE: // a5 <= a4  => slt a5, a4, a5; xori a5, a5, 1
-                    input_str(obj_file, "    slt %s,%s,%s\n", reg_name[res_reg], reg_name[reg_c], reg_name[reg_b]); // res = (c < b)
-                    input_str(obj_file, "    xori %s,%s,1\n", reg_name[res_reg], reg_name[res_reg], 1); // res = !(c < b) => b <= c
-                    break;
-                case TAC_GT: // a5 > a4   => slt a5, a4, a5
-                    input_str(obj_file, "    slt %s,%s,%s\n", reg_name[res_reg], reg_name[reg_c], reg_name[reg_b]);
-                    break;
-                case TAC_GE: // a5 >= a4  => slt a5, a5, a4; xori a5, a5, 1
-                    input_str(obj_file, "    slt %s,%s,%s\n", reg_name[res_reg], reg_name[reg_b], reg_name[reg_c]); // res = (b < c)
-                    input_str(obj_file, "    xori %s,%s,1\n", reg_name[res_reg], reg_name[res_reg], 1);    // res = !(b < c) => b >= c
-                    break;
-            }
-		}
-		else{
-			int imm_c = reg_b==-1?b->num.num_int:c->num.num_int;
-			int reg_temp = reg_b==-1?reg_c:reg_b;
-			if(reg_b==-1){//b是立即数，op需要反转一下
-				if(op>=TAC_LE&&op<=TAC_GE){
+				case TAC_NE: // a5 != a4  => sub a5, a5, a4; snez a5, a5
+					R_TYPE("sub", res_n, b_n, c_n);
+					PSEUDO_2_REG("snez", res_n, res_n);
+					break;
+				case TAC_LT: // a5 < a4   => slt a5, a5, a4
+					R_TYPE("slt", res_n, b_n, c_n);
+					break;
+				case TAC_LE: // a5 <= a4  => slt a5, a4, a5; xori a5, a5, 1
+					R_TYPE("slt", res_n, c_n, b_n); // res = (c < b)
+					I_TYPE_ARITH("xori", res_n, res_n, 1); // res = !(c < b) => b <= c
+					break;
+				case TAC_GT: // a5 > a4   => slt a5, a4, a5
+					R_TYPE("slt", res_n, c_n, b_n);
+					break;
+				case TAC_GE: // a5 >= a4  => slt a5, a5, a4; xori a5, a5, 1
+					R_TYPE("slt", res_n, b_n, c_n); // res = (b < c)
+					I_TYPE_ARITH("xori", res_n, res_n, 1); // res = !(b < c) => b >= c
+					break;
+			}
+		} else {
+			int imm_c = reg_b == -1 ? b->num.num_int : c->num.num_int;
+			int reg_temp = reg_b == -1 ? reg_c : reg_b;
+			const char *temp_n = reg_name[reg_temp];
+
+			if (reg_b == -1) { // b 是立即数，op 需要反转
+				if (op >= TAC_LE && op <= TAC_GE) {
 					switch (op) {
 						case TAC_LE: op = TAC_GE; break;
 						case TAC_LT: op = TAC_GT; break;
@@ -167,56 +132,34 @@ void asm_cmp(int op, struct id *a, struct id *b, struct id *c) {
 					}
 				}
 			}
+
 			switch (op) {
-                case TAC_EQ: 
-                    if (imm_c == 0) { // var == 0
-                        input_str(obj_file, "    seqz %s,%s\n", reg_name[res_reg], reg_name[reg_temp]);
-                    } else { // var == non_zero_imm
-                        input_str(obj_file, "    addi %s,%s,%d\n", reg_name[res_reg], reg_name[reg_temp], -imm_c);
-                        input_str(obj_file, "    seqz %s,%s\n", reg_name[res_reg], reg_name[res_reg]);
-                    }
-                    break;
-                case TAC_NE: // a5 != imm_c => addi temp, a5, -imm_c; snez a5, temp
-                    if (imm_c == 0) { // var != 0
-                        input_str(obj_file, "    snez %s,%s\n", reg_name[res_reg], reg_name[reg_temp]);
-                    } else { // var != non_zero_imm
-                        input_str(obj_file, "    addi %s,%s,%d\n", reg_name[res_reg], reg_name[reg_temp], -imm_c);
-                        input_str(obj_file, "    snez %s,%s\n", reg_name[res_reg], reg_name[res_reg]);
-                    }
-                    break;
-                case TAC_LT: // a5 < imm_c  => slti a5, a5, imm_c
-                    if (imm_c == 0) {
-						input_str(obj_file, "    slt %s,%s,zero\n", reg_name[res_reg], reg_name[reg_temp]); // a5 = (0 < a5) => a5 > 0
-					} else {
-						input_str(obj_file, "    slti %s,%s,%d\n", reg_name[res_reg], reg_name[reg_temp], imm_c);
-					}
+				case TAC_EQ:
+					I_TYPE_ARITH("addi", res_n, temp_n, -imm_c);
+					PSEUDO_2_REG("seqz", res_n, res_n);
 					break;
-                case TAC_LE: //a5 <= imm_c => slti a5, a5, imm_c + 1; xori a5, a5, 1
-					if (imm_c+1 == 0) {
-						input_str(obj_file, "    slt %s,%s,zero\n", reg_name[res_reg], reg_name[reg_temp]); // a5 = (0 < a5) => a5 > 0
-					} else {
-						input_str(obj_file, "    slti %s,%s,%d\n", reg_name[res_reg], reg_name[reg_temp], imm_c+1);
-					}
+				case TAC_NE: // a5 != imm_c => addi temp, a5, -imm_c; snez a5, temp
+					I_TYPE_ARITH("addi", res_n, temp_n, -imm_c);
+					PSEUDO_2_REG("snez", res_n, res_n);
 					break;
-                case TAC_GT: // a5 > imm_c  => slti a5, a5, imm_c+1; xori a5, a5, 1
-					if (imm_c+1 == 0) {
-						input_str(obj_file, "    slt %s,%s,zero\n", reg_name[res_reg], reg_name[reg_temp]); // a5 = (0 < a5) => a5 > 0
-					} else {
-						input_str(obj_file, "    slti %s,%s,%d\n", reg_name[res_reg], reg_name[reg_temp], imm_c+1);
-						input_str(obj_file, "    xori %s,%s,1\n", reg_name[res_reg], reg_name[res_reg]);
-					}
+				case TAC_LT: // a5 < imm_c  => slti a5, a5, imm_c
+					I_TYPE_ARITH("slti", res_n, temp_n, imm_c);
 					break;
-                case TAC_GE: // a5 >= imm_c => slti a5, a5, imm_c; xori a5, a5, 1
-					if (imm_c == 0) {
-						input_str(obj_file, "    slt %s,%s,zero\n", reg_name[res_reg], reg_name[reg_temp]); // a5 = (0 < a5) => a5 > 0
-					} else {
-						input_str(obj_file, "    slti %s,%s,%d\n", reg_name[res_reg], reg_name[reg_temp], imm_c);
-						input_str(obj_file, "    xori %s,%s,1\n", reg_name[res_reg], reg_name[res_reg]);
-					}
+				case TAC_LE: // a5 <= imm_c => slti a5, a5, imm_c + 1; xori a5, a5, 1
+					I_TYPE_ARITH("slti", res_n, temp_n, imm_c + 1);
+					I_TYPE_ARITH("xori", res_n, res_n, 1);
+					break;
+				case TAC_GT: // a5 > imm_c  => slti a5, a5, imm_c + 1; xori a5, a5, 1
+					I_TYPE_ARITH("slti", res_n, temp_n, imm_c + 1);
+					I_TYPE_ARITH("xori", res_n, res_n, 1);
+					break;
+				case TAC_GE: // a5 >= imm_c => slti a5, a5, imm_c; xori a5, a5, 1
+					I_TYPE_ARITH("slti", res_n, temp_n, imm_c);
+					I_TYPE_ARITH("xori", res_n, res_n, 1);
 					break;
 			}
 		}
-		input_str(obj_file, "    andi %s,%s,0xff\n", reg_name[res_reg], reg_name[res_reg]);
+	I_TYPE_ARITH("andi", res_n, res_n, 0xff);
 	asm_store_var(a,reg_name[res_reg]);
 	if(res_reg==R_a5)rdesc_fill(R_a5,a,MODIFIED);
 	}
@@ -226,15 +169,14 @@ void asm_cond(char *op, struct id *a, const char *l) {
 	//for (int r = R_GEN; r < R_NUM; r++) asm_write_back(r);
 
 	if (a != NULL) {
-		int r=reg_find(a);
-		input_str(obj_file, "	%s %s,zero,.%s\n", op,reg_name[r],l);
-	}
-	else{
-		input_str(obj_file, "	%s .%s\n", op, l);
+		int r = reg_find(a);
+		B_TYPE_BRANCH(op, reg_name[r], reg_name[R_zero], l); // 使用 B_TYPE_BRANCH 宏
+	} else {
+		J_TYPE_JUMP_PSEUDO(op, l); // 使用 J_TYPE_JUMP_PSEUDO 宏
 	}
 }
 //XXX:需要考虑不同变量的大小，这里默认都是int
-void asm_stack_pivot(struct tac* code){
+void asm_stack_pivot(struct tac* code) {
 	oon = 0;
 	int var_size = 0;
 	int param_size = 0;
@@ -255,27 +197,26 @@ void asm_stack_pivot(struct tac* code){
 	oon = var_size + param_size + 16;
 	tof = LOCAL_OFF;
 	oof = FORMAL_OFF-var_size;
-	input_str(obj_file, "	addi sp,sp,-%d\n", oon);
-	input_str(obj_file, "	sw ra,%d(sp)\n",oon-4);
-	input_str(obj_file, "	sw s0,%d(sp)\n",oon-8);
-	input_str(obj_file, "	addi s0,sp,%d\n", oon);
+	I_TYPE_ARITH("addi", "sp", "sp", -oon);
+	S_TYPE_STORE("sw", "ra", "sp", oon - 4); // 使用 S_TYPE_STORE 宏
+	S_TYPE_STORE("sw", "s0", "sp", oon - 8); // 使用 S_TYPE_STORE 宏
+	I_TYPE_ARITH("addi", "s0", "sp", oon);   // 使用 I_TYPE_ARITH 宏
 }
-void asm_param(struct tac*code){
+void asm_param(struct tac* code) {
 	int cnt = 0;
 	struct tac *cur = code->next;
 	int data_size;
 	while (cur->type == TAC_PARAM)
 	{
 		LOCAL_VAR_OFFSET(cur->id_1, oof);
-		// TODO:
-		asm_store_var(cur->id_1, args_name[cnt]);
+		asm_store_var(cur->id_1, args_name[cnt]); // 使用 asm_store_var
 		cur = cur->next;
 		cnt++;
 	}
 }
 // 生成函数调用对应的汇编代码
 //XXX:没考虑大于8个参数如何传递
-void asm_call(struct tac*code,struct id *a, struct id *b) {
+void asm_call(struct tac* code, struct id *a, struct id *b) {
 	int r;
 	int cnt = 0;
 	// for (int r = R_GEN; r < R_NUM; r++) asm_write_back(r);
@@ -291,18 +232,16 @@ void asm_call(struct tac*code,struct id *a, struct id *b) {
 	while (cur->type==TAC_ARG)
 	{
 		r++;
-		asm_load_var(cur->id_1, args_name[cnt - r]);
+		asm_load_var(cur->id_1, args_name[cnt - r]); // 使用 asm_load_var
 		cur = cur->next;
 	}
-
-	input_str(obj_file, "	call	%s@plt\n", b->name);
-	if (a != NULL)
-	{
-		asm_store_var(a, reg_name[R_a0]);
-		rdesc_fill(R_a0,a,MODIFIED);
+	J_TYPE_JUMP_PSEUDO("call", b->name); // 使用 J_TYPE_JUMP_PSEUDO 宏
+	if (a != NULL) {
+		asm_store_var(a, reg_name[R_a0]); // 使用 asm_store_var
+		rdesc_fill(R_a0, a, MODIFIED);
 	}
 }
-void asm_label(struct id *a){
+void asm_label(struct id *a) {
 	for (int r = R_GEN; r < R_NUM; r++) rdesc_clear_all(r);
 	if(a->id_type==ID_LABEL){
 		input_str(obj_file, ".%s:\n", a->name);
@@ -315,7 +254,7 @@ void asm_label(struct id *a){
 	}
 }
 
-void asm_gvar(struct id *a){
+void asm_gvar(struct id *a) {
 	int data_size = TYPE_SIZE(a->data_type);
 	a->scope = 0; /* global var */
 	input_str(obj_file, "	.globl	%s\n", a->name);
@@ -324,7 +263,7 @@ void asm_gvar(struct id *a){
 	input_str(obj_file, "	.type	%s,@object\n", a->name);
 	input_str(obj_file, "	.size %s, %d\n", a->name, data_size);
 	input_str(obj_file, "%s:\n", a->name);
-	input_str(obj_file, "	.zero	%d", data_size);//XXX:需要实现全局变量赋值后作改动
+	input_str(obj_file, "	.zero	%d", data_size); 
 }
 // 生成函数返回对应的汇编代码
 void asm_return(struct id *a) {
@@ -334,35 +273,33 @@ void asm_return(struct id *a) {
 	if (a != NULL) /* return value */
 	{
 		int r=reg_find(a);
-		input_str(obj_file, "	mv %s,%s\n", reg_name[R_a0],reg_name[r]);
+		PSEUDO_2_REG("mv", reg_name[R_a0], reg_name[r]); // 使用 PSEUDO_2_REG 宏
 	}
 
-	input_str(obj_file, "	lw ra,%d(sp)\n",oon-4);
-	input_str(obj_file, "	lw s0,%d(sp)\n",oon-8);
-	input_str(obj_file, "	addi sp,sp,%d\n", oon);
-	input_str(obj_file, "	jr ra\n");
-
+	I_TYPE_LOAD("lw", "ra", "sp", oon - 4); // 使用 I_TYPE_LOAD 宏
+	I_TYPE_LOAD("lw", "s0", "sp", oon - 8); // 使用 I_TYPE_LOAD 宏
+	I_TYPE_ARITH("addi", "sp", "sp", oon);  // 使用 I_TYPE_ARITH 宏
+	J_TYPE_JUMP_REG("jr", "ra");           // 使用 J_TYPE_JUMP_REG 宏
 }
 
-void asm_load_var(struct id *s,const char *r) {
-	if(s->id_type==ID_NUM){
-		input_str(obj_file, "	li %s,%d\n", r,s->num);
-	}
-	else if (s->scope == GLOBAL_TABLE) {
+void asm_load_var(struct id *s, const char *r) {
+	if (s->id_type == ID_NUM) {
+		U_TYPE_UPPER_IMM("li", r, s->num); // 使用 U_TYPE_UPPER_IMM 宏
+	} else if (s->scope == GLOBAL_TABLE) {
 		int addr_reg = reg_get();
-		input_str(obj_file, "	la %s,%s\n",reg_name[addr_reg], s->name);
-		input_str(obj_file, "	%s %s,0(%s)\n",LOAD_OP(TYPE_SIZE(s->data_type)),r,reg_name[addr_reg]);
-	} 
-	else {
-		input_str(obj_file, "	%s %s,%d(s0)\n",LOAD_OP(TYPE_SIZE(s->data_type)), r,s->offset);
+		U_TYPE_UPPER_IMM("la", reg_name[addr_reg], s->name); // 使用 U_TYPE_UPPER_IMM 宏
+		I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), r, reg_name[addr_reg], 0); // 使用 I_TYPE_LOAD 宏
+	} else {
+		I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), r, "s0", s->offset); // 使用 I_TYPE_LOAD 宏
 	}
 }
-void asm_store_var(struct id *s,const char *r) {
+
+void asm_store_var(struct id *s, const char *r) {
 	if (s->scope == GLOBAL_TABLE) {
 		int addr_reg = reg_get();
-		input_str(obj_file, "	la %s,%s\n",reg_name[addr_reg], s->name);
-		input_str(obj_file, "	%s %s,0(%s)\n",STORE_OP(TYPE_SIZE(s->data_type)),r,reg_name[addr_reg]);
+		U_TYPE_UPPER_IMM("la", reg_name[addr_reg], s->name); // 使用 U_TYPE_UPPER_IMM 宏
+		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->data_type)), r, reg_name[addr_reg], 0); // 使用 S_TYPE_STORE 宏
 	} else {
-		input_str(obj_file, "	%s %s,%d(s0)\n",STORE_OP(TYPE_SIZE(s->data_type)), r,s->offset);
+		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->data_type)), r, "s0", s->offset); // 使用 S_TYPE_STORE 宏
 	}
 }

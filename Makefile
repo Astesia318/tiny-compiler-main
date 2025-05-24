@@ -26,7 +26,7 @@ BACK_INCS := $(INCDIR)/o_asm.h \
 		$(INCDIR)/o_wrap.h     
 
 MACHINE_SRCS := $(ASMDIR)/machine.c
-BACK_INCS := $(INCDIR)/opcode.h
+BACK_INCS := $(INCDIR)/riscv.h
 LEX_ASM_SRC := $(ASMDIR)/asm.l
 YACC_ASM_SRC := $(ASMDIR)/asm.y
 

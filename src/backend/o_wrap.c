@@ -9,7 +9,7 @@
 #include <time.h>
 
 #include "e_tac.h"
-
+#include "riscv.h"
 /* global var */
 int tos; /* top of static */
 int tof; /* top of frame */

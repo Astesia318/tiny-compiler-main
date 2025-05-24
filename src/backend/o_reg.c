@@ -8,6 +8,7 @@
 #include <time.h>
 
 #include "e_tac.h"
+#include "riscv.h"
 
 /* global var */
 struct rdesc rdesc[R_NUM];
@@ -109,7 +110,7 @@ void asm_load(int r, struct id *s) {
 
 			/* load from the reg */
 			if (r != latest_appear) {
-				input_str(obj_file, "	mv %s,%s\n", reg_name[r], reg_name[latest_appear]);
+				PSEUDO_2_REG("mv", reg_name[r], reg_name[latest_appear]); // 使用 PSEUDO_2_REG 宏
 				rdesc[latest_appear].next = &rdesc[r];
 				rdesc[r].prev = &rdesc[latest_appear];
 			}
@@ -120,22 +121,23 @@ void asm_load(int r, struct id *s) {
 	/* not in a reg */
 	switch (s->id_type) {
 		case ID_NUM:
-			input_str(obj_file, "	li %s,%d\n", reg_name[r], s->num);
+			U_TYPE_UPPER_IMM("li", reg_name[r], s->num); // 使用 U_TYPE_UPPER_IMM 宏
 			break;
 
 		case ID_TEMP:
 		case ID_VAR:
 			if (s->scope == GLOBAL_TABLE) {
-				input_str(obj_file, "	la a5,%s\n", s->name);
-				input_str(obj_file, "	lw %s,0(a5)\n",reg_name[r]);
+				U_TYPE_UPPER_IMM("la", "a5", s->name); // 使用 U_TYPE_UPPER_IMM 宏
+				I_TYPE_LOAD("lw", reg_name[r], "a5", 0); // 使用 I_TYPE_LOAD 宏
 			} else {
-				input_str(obj_file, "	%s %s,%d(s0)\n",LOAD_OP(TYPE_SIZE(s->data_type)), reg_name[r],s->offset);
+				I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), reg_name[r], "s0", s->offset); // 使用 I_TYPE_LOAD 宏
 			}
 			break;
-		//TODO:	
-		case ID_STRING:
-			input_str(obj_file, "	LOD R%u,L%u\n", reg_name[r], s->label);
-			break;
+
+		// TODO:
+		// case ID_STRING:
+		// 	input_str(obj_file, "	LOD R%u,L%u\n", reg_name[r], s->label);
+		// 	break;
 	}
 
 	// rdesc_fill(r, s, UNMODIFIED);

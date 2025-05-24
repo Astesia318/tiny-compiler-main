@@ -6,15 +6,13 @@ int func(int a)
 int globallll;
 int main()
 {
-    float b;
-    float c;
     int a;
-    c = 1.5;
-    b = 1.2;
-    a = c + b;
-    a = c - b;
-    a = c * b;
-    a = c / b;
-
+    int b;
+    char x;
+    a = 10;
+    b = 12;
+    x = 'a';
+    b = 'x' + 'y';
+    a = x > 'c';
     return 0;
 }

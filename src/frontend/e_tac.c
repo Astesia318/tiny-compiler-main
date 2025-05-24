@@ -230,9 +230,11 @@ const char *id_to_str(struct id *id) {
 
 	switch (id->id_type) {
 		case ID_NUM:
-			if(id->data_type==DATA_CHAR){
-				sprintf(temp_buf, "\'%s\'", id->name);
-				return temp_buf;
+		//XXX:怎么释放
+			if (id->data_type == DATA_CHAR) {
+				char *buf = (char *)malloc(16); // 动态分配内存
+				sprintf(buf, "\'%s\'", id->name);
+				return buf; // 返回动态分配的字符串
 			}
 		case ID_VAR:
 		case ID_FUNC:
