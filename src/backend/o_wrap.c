@@ -197,7 +197,7 @@ void asm_lc(struct id *s) {
 		for (int i = TYPE_SIZE(DATA_DOUBLE) - TYPE_SIZE(s->data_type); i < TYPE_SIZE(DATA_DOUBLE); i += TYPE_SIZE(DATA_FLOAT))
 		{
 			int temp;
-			memcpy(&temp, (void*)(&s->num)+i, TYPE_SIZE(DATA_FLOAT));
+			memcpy(&temp, (void*)(&s->num)+0, TYPE_SIZE(DATA_FLOAT));
 			input_str(obj_file, "	.word	%d\n", temp);
 		}
 	}

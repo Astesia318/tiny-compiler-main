@@ -97,7 +97,7 @@ struct id {
 	const char *name;
 	union {
 		int num_int;
-		double num_float;
+		float num_float;//XXX:默认只实现float了先，process_float中也默认传入DATA_FLOAT了,asm_lc中的取址逻辑也要因此修改
 		char num_char;
 	} num;
 	int id_type;
