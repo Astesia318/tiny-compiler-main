@@ -145,9 +145,8 @@ void asm_cmp(int op, struct id *a, struct id *b, struct id *c) {
 				case TAC_LT: // a5 < imm_c  => slti a5, a5, imm_c
 					I_TYPE_ARITH("slti", res_n, temp_n, imm_c);
 					break;
-				case TAC_LE: // a5 <= imm_c => slti a5, a5, imm_c + 1; xori a5, a5, 1
+				case TAC_LE: // a5 <= imm_c => slti a5, a5, imm_c + 1;
 					I_TYPE_ARITH("slti", res_n, temp_n, imm_c + 1);
-					I_TYPE_ARITH("xori", res_n, res_n, 1);
 					break;
 				case TAC_GT: // a5 > imm_c  => slti a5, a5, imm_c + 1; xori a5, a5, 1
 					I_TYPE_ARITH("slti", res_n, temp_n, imm_c + 1);
@@ -244,7 +243,7 @@ void asm_call(struct tac* code, struct id *a, struct id *b) {
 void asm_label(struct id *a) {
 	for (int r = R_GEN; r < R_NUM; r++) rdesc_clear_all(r);
 	if(a->id_type==ID_LABEL){
-		input_str(obj_file, ".%s:\n", a->name);
+		input_str(obj_file, "%s:\n", a->name);
 	}
 	else if(a->id_type==ID_FUNC){
 		input_str(obj_file, "	.align	2\n");

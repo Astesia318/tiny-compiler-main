@@ -22,8 +22,10 @@
 //jr 
 #define J_TYPE_JUMP_REG(op_mnemonic, dest_reg_name) \
     input_str(obj_file, "    %s %s\n", op_mnemonic, dest_reg_name)
-//call
+//call j
 #define J_TYPE_JUMP_PSEUDO(op_mnemonic, label_name) \
+    op_mnemonic=="call"?  \
+    input_str(obj_file, "    %s %s@plt\n", op_mnemonic, label_name) : \
     input_str(obj_file, "    %s %s\n", op_mnemonic, label_name)
 //mv seqz
 #define PSEUDO_2_REG(op_mnemonic,dest_reg_name,src_reg_name) \

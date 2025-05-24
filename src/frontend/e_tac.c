@@ -19,7 +19,7 @@ static struct id *_find_identifier(const char *name, struct id **id_table,
 	struct id *cur = *id_table;
 
 	while (cur) {
-		if (cur->name && !strcmp(name, cur->name) &&(check==CHECK_ID_NOT_EXIST || cur->id_type==ID_VAR)) {//check exist时找到的必须是var
+		if (cur->name && !strcmp(name, cur->name) &&(check==CHECK_ID_NOT_EXIST || !ID_IS_CONST(cur))) {//check exist时找到的必须是标识符
 			has_finded = 1;
 			id_wanted = cur;
 			break;
@@ -213,7 +213,7 @@ struct id *new_temp(int data_type) {
 
 struct id *new_label() {
 	NAME_ALLOC(label);
-	sprintf(label, "L%d", label_amount++);
+	sprintf(label, ".L%d", label_amount++);
 	return add_identifier(label, ID_LABEL, NO_DATA);
 }
 
