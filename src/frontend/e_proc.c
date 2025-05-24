@@ -26,12 +26,37 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 	cat_tac(exp, NEW_TAC_1(TAC_VAR, t));
 	cat_op(exp, exp_l);	 // 拼接exp和exp_l的code
 	cat_op(exp, exp_r);	 // 拼接exp和exp_r的code
-	cat_tac(
-		exp,
-		NEW_TAC_3(
-			cal, exp->addr, exp_l_addr,
-			exp_r_addr));  // 生成代表目标表达式的三地址码，并拼接至exp的code末尾
+	if (exp_l_addr->data_type == DATA_FLOAT || exp_r_addr->data_type == DATA_FLOAT) {
+		// 对于浮点数的运算，生成调用内部函数的三地址码
+		struct id *func = add_identifier(TAC_TO_FUNC(cal), ID_FUNC, DATA_FLOAT);
+		cat_tac(exp, NEW_TAC_1(TAC_ARG, exp_r_addr)); // 生成 arg b
+		cat_tac(exp, NEW_TAC_1(TAC_ARG, exp_l_addr)); // 生成 arg a
+		cat_tac(exp, NEW_TAC_2(TAC_CALL, t, func));   // 生成 t1=call func
+		if(TAC_IS_CMP(cal)){
 
+			struct id *label_1 = new_label();
+			struct id *label_2 = new_label();
+			
+			struct id *const_0 = add_identifier("0", ID_NUM, DATA_INT);
+			const_0->num.num_int = 0;
+			struct id *const_1 = add_identifier("1.0", ID_NUM, DATA_FLOAT);
+			const_1->num.num_float = 1.0;
+
+			cat_tac(exp, NEW_TAC_2(TAC_IFZ, t, label_1));
+			cat_tac(exp, NEW_TAC_2(TAC_ASSIGN, t,const_1));
+			cat_tac(exp, NEW_TAC_1(TAC_GOTO, label_2));
+			cat_tac(exp, NEW_TAC_1(TAC_LABEL, label_1));
+			cat_tac(exp, NEW_TAC_2(TAC_ASSIGN, t,const_0));
+			cat_tac(exp, NEW_TAC_1(TAC_LABEL, label_2));
+		}
+	} 
+	else {
+		cat_tac(
+			exp,
+			NEW_TAC_3(
+				cal, exp->addr, exp_l_addr,
+				exp_r_addr));  // 生成代表目标表达式的三地址码，并拼接至exp的code末尾
+	}
 	return exp;
 }
 

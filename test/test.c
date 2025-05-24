@@ -1,27 +1,35 @@
-int global;
-char func(char a)
+// int global;
+float func(float a)
 {
-    return a;
+    float b;
+    b = a;
+    return b;
 }
-int main()
+float main()
 {
+    float x;
+    float y;
+    float z;
     int a;
-    int b;
-    char x;
-    char temp;
-
-    a = 10;
-    b = 12;
-    x = 'a';
-    b = 'x' + 'y';
-    temp = func('d');
-    while (x >temp)
-    {
-        b = '1';
-        if(a<='2'){
-            break;
-        }
+    a = 0;
+    x = 2.6;
+    y = 3.4;
+    z = x + y;
+    z = x - y;
+    z = x * y;
+    z = x / y;
+    z = x < y;
+    z = x > y;
+    z = x >= y;
+    z = x <= y;
+    z = x == y;
+    z = x != y;
+    if(a==1){
+        x = a;
+        a = x;
     }
-
-    return 0;
+    else{
+        a = 1;
+    }
+    return z;
 }

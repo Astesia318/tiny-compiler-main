@@ -89,11 +89,25 @@
 	pointer = (type *)malloc((amount) * sizeof(type)); \
 	memset(pointer, 0, (amount) * sizeof(type));
 
+#define TAC_IS_CMP(cal) (cal>=TAC_EQ && cal<=TAC_GE)
 #define ID_IS_CONST(id) (id->id_type == ID_NUM || id->id_type == ID_STRING)
 #define ID_IS_GCONST(id_type,data_type) (id_type ==ID_STRING || id_type == ID_NUM && (data_type == DATA_FLOAT || data_type == DATA_DOUBLE))
-
+#define TAC_TO_FUNC(cal) (	\
+	cal==TAC_PLUS? "__addsf3" :	\
+	cal==TAC_MINUS? "__subsf3" :	\
+	cal==TAC_MULTIPLY? "__mulsf3" :	\
+	cal==TAC_DIVIDE? "__divsf3" :	\
+	cal==TAC_EQ? "__eqsf2" :	\
+	cal==TAC_NE? "__nesf2" :	\
+	cal==TAC_LT? "__ltsf2" :	\
+	cal==TAC_LE? "__lesf2" :	\
+	cal==TAC_GT? "__gtsf2" :	\
+	cal==TAC_GE? "__gesf2" :	\
+	""	\
+)
 // 符号
-struct id {
+struct id
+{
 	const char *name;
 	union {
 		int num_int;

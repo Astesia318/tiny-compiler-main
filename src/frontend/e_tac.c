@@ -43,8 +43,8 @@ static struct id **_choose_id_table(int table) {
 	}
 }
 
-static struct id *_collide_identifier(const char *name, int id_type) {
-	if (id_type == ID_STRING)
+static struct id *_collide_identifier(const char *name, int id_type,int data_type) {
+	if (ID_IS_GCONST(id_type,data_type))
 		return _find_identifier(name, _choose_id_table(GLOBAL_TABLE),
 								CHECK_ID_NOT_EXIST);
 	else
@@ -56,9 +56,9 @@ static struct id *_add_identifier(const char *name, int id_type, int data_type,
 								  struct id **id_table) {
 	struct id *id_wanted;
 
-	struct id *id_collision = _collide_identifier(name, id_type);
+	struct id *id_collision = _collide_identifier(name, id_type,data_type);
 	if (id_collision) {//表内有同名id
-		if (ID_IS_CONST(id_collision)) {//表中已有同名常量id，返回
+		if (ID_IS_GCONST(id_collision->id_type,data_type)) {//表中已有同名常量id，返回
 			return id_collision;
 		} 
 		else if(id_type!=ID_NUM){
@@ -67,7 +67,7 @@ static struct id *_add_identifier(const char *name, int id_type, int data_type,
 			printf("add name: %s\n", name);
 			return NULL;
 		}
-		//字符常量与标识符名冲突，正常添加XXX:会添加多个相同常量
+		//字符常量与标识符名冲突，正常添加XXX:现在会添加多个除GCONST外的相同常量
 	}
 	//没有冲突，向表内添加
 	MALLOC_AND_SET_ZERO(id_wanted, 1, struct id);
