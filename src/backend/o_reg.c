@@ -88,12 +88,12 @@ void asm_write_back(int r) {
 	if ((rdesc[r].var != NULL) && rdesc[r].mod) {
 		if (rdesc[r].var->scope == 1) /* local var */
 		{
-			input_str(obj_file, "	STO (R%u+%u),R%u\n", R_BP,
+			input_str(obj_file, "\tSTO (R%u+%u),R%u\n", R_BP,
 					  rdesc[r].var->offset, r);
 		} else /* global var */
 		{
-			input_str(obj_file, "	LOD R%u,STATIC\n", R_TP);
-			input_str(obj_file, "	STO (R%u+%u),R%u\n", R_TP,
+			input_str(obj_file, "\tLOD R%u,STATIC\n", R_TP);
+			input_str(obj_file, "\tSTO (R%u+%u),R%u\n", R_TP,
 					  rdesc[r].var->offset, r);
 		}
 		rdesc[r].mod = UNMODIFIED;
@@ -119,21 +119,7 @@ void asm_load(int r, struct id *s) {
 	}
 
 	/* not in a reg */
-	if(ID_IS_GCONST(s->id_type,s->data_type)){//XXX:不知道适不适配string
-		U_TYPE_UPPER_SYM("lla", "a5", s->label); // 使用 U_TYPE_UPPER_IMM 宏
-		I_TYPE_LOAD("lw", reg_name[r], reg_name[r], 0);
-	}
-	else if(s->id_type==ID_NUM && s->data_type==DATA_INT){
-		U_TYPE_UPPER_IMM("li", reg_name[r], s->num); // 使用 U_TYPE_UPPER_IMM 宏
-	}
-	else {//TEMP or VAR
-		if (s->scope == GLOBAL_TABLE) {
-			U_TYPE_UPPER_SYM("la", reg_name[r], s->name); // 使用 U_TYPE_UPPER_IMM 宏
-			I_TYPE_LOAD("lw", reg_name[r], reg_name[r], 0); // 使用 I_TYPE_LOAD 宏
-		} else {
-			I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), reg_name[r], "s0", s->offset); // 使用 I_TYPE_LOAD 宏
-		}
-	}
+	asm_load_var(s, reg_name[r]);
 	// rdesc_fill(r, s, UNMODIFIED);
 }
 // 为符号分配寄存器
@@ -181,4 +167,33 @@ int reg_find(struct id *s) {
 	}
 
 	return reg_alloc(s);
+}
+
+void asm_load_var(struct id *s, const char *r) {
+	
+	if(ID_IS_GCONST(s->id_type,s->data_type)){//XXX:不知道适不适配string
+		U_TYPE_UPPER_SYM("lla", "a5", s->label); // 使用 U_TYPE_UPPER_IMM 宏
+		I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), r, r, 0);
+	}
+	else if(s->id_type==ID_NUM && s->data_type==DATA_INT){
+		U_TYPE_UPPER_IMM("li", r, s->num); // 使用 U_TYPE_UPPER_IMM 宏
+	}
+	else {//TEMP or VAR
+		if (s->scope == GLOBAL_TABLE) {
+			U_TYPE_UPPER_SYM("la", r, s->name); // 使用 U_TYPE_UPPER_IMM 宏
+			I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), r, r, 0); // 使用 I_TYPE_LOAD 宏
+		} else {
+			I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), r, "s0", s->offset); // 使用 I_TYPE_LOAD 宏
+		}
+	}
+}
+
+void asm_store_var(struct id *s, const char *r) {
+	if (s->scope == GLOBAL_TABLE) {
+		int addr_reg = reg_get();
+		U_TYPE_UPPER_SYM("la", reg_name[addr_reg], s->name); // 使用 U_TYPE_UPPER_IMM 宏
+		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->data_type)), r, reg_name[addr_reg], 0); // 使用 S_TYPE_STORE 宏
+	} else {
+		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->data_type)), r, "s0", s->offset); // 使用 S_TYPE_STORE 宏
+	}
 }

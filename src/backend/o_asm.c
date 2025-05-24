@@ -47,13 +47,13 @@ void asm_bin(char *op, struct id *a, struct id *b, struct id *c) {
 		}
 		//op
 		if(reg_b!=-1&&reg_c!=-1)input_str(obj_file, 
-											"	%s a5,%s,%s\n", 
+											"\t%s a5,%s,%s\n", 
 											op,
 											reg_name[reg_b],
 											reg_name[reg_c]);
 		else {
 			input_str(obj_file, 
-						"	addi a5,%s,%d\n", 
+						"\taddi a5,%s,%d\n", 
 						reg_b!=-1?
 							reg_name[reg_b]:
 							reg_name[reg_c],
@@ -246,9 +246,9 @@ void asm_label(struct id *a) {
 		input_str(obj_file, "%s:\n", a->name);
 	}
 	else if(a->id_type==ID_FUNC){
-		input_str(obj_file, "	.align	2\n");
-		input_str(obj_file, "	.globl	%s\n", a->name);
-		input_str(obj_file, "	.type	%s,@function\n", a->name);
+		input_str(obj_file, "\t.align	2\n");
+		input_str(obj_file, "\t.globl	%s\n", a->name);
+		input_str(obj_file, "\t.type	%s,@function\n", a->name);
 		input_str(obj_file, "%s:\n", a->name);
 	}
 }
@@ -256,13 +256,13 @@ void asm_label(struct id *a) {
 void asm_gvar(struct id *a) {
 	int data_size = TYPE_SIZE(a->data_type);
 	a->scope = 0; /* global var */
-	input_str(obj_file, "	.globl	%s\n", a->name);
-	input_str(obj_file, "	.bss\n");
-	input_str(obj_file, "	.align	%d\n",TYPE_ALIGN(a->data_type));
-	input_str(obj_file, "	.type	%s,@object\n", a->name);
-	input_str(obj_file, "	.size %s, %d\n", a->name, data_size);
+	input_str(obj_file, "\t.globl	%s\n", a->name);
+	input_str(obj_file, "\t.bss\n");
+	input_str(obj_file, "\t.align	%d\n",TYPE_ALIGN(a->data_type));
+	input_str(obj_file, "\t.type	%s,@object\n", a->name);
+	input_str(obj_file, "\t.size %s, %d\n", a->name, data_size);
 	input_str(obj_file, "%s:\n", a->name);
-	input_str(obj_file, "	.zero	%d", data_size); 
+	input_str(obj_file, "\t.zero	%d", data_size); 
 }
 // 生成函数返回对应的汇编代码
 void asm_return(struct id *a) {
@@ -281,24 +281,3 @@ void asm_return(struct id *a) {
 	J_TYPE_JUMP_REG("jr", "ra");           // 使用 J_TYPE_JUMP_REG 宏
 }
 
-void asm_load_var(struct id *s, const char *r) {
-	if (s->id_type == ID_NUM) {
-		U_TYPE_UPPER_IMM("li", r, s->num); // 使用 U_TYPE_UPPER_IMM 宏
-	} else if (s->scope == GLOBAL_TABLE) {
-		int addr_reg = reg_get();
-		U_TYPE_UPPER_SYM("la", reg_name[addr_reg], s->name); // 使用 U_TYPE_UPPER_IMM 宏
-		I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), r, reg_name[addr_reg], 0); // 使用 I_TYPE_LOAD 宏
-	} else {
-		I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), r, "s0", s->offset); // 使用 I_TYPE_LOAD 宏
-	}
-}
-
-void asm_store_var(struct id *s, const char *r) {
-	if (s->scope == GLOBAL_TABLE) {
-		int addr_reg = reg_get();
-		U_TYPE_UPPER_SYM("la", reg_name[addr_reg], s->name); // 使用 U_TYPE_UPPER_IMM 宏
-		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->data_type)), r, reg_name[addr_reg], 0); // 使用 S_TYPE_STORE 宏
-	} else {
-		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->data_type)), r, "s0", s->offset); // 使用 S_TYPE_STORE 宏
-	}
-}

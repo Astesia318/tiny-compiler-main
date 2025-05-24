@@ -1,6 +1,10 @@
 #ifndef REG_MANAGER_H
 #define REG_MANAGER_H
 
+#ifndef DEBUG_PRINT
+#define DEBUG_PRINT 1
+#endif
+
 #define R_UNDEF -1
 #define R_a5 0
 #define R_a4 1
@@ -129,6 +133,8 @@ void rdesc_clear_temp(int r);
 void rdesc_fill(int r, struct id *s, int mod);
 void asm_write_back(int r);
 void asm_load(int r, struct id *s);
+void asm_load_var(struct id *a, const char *reg); // sw reg &a
+void asm_store_var(struct id *a, const char *reg);//sw reg &a
 int reg_find(struct id *s);
 int reg_alloc(struct id *s);
 int reg_get();

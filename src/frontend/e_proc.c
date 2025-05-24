@@ -26,6 +26,7 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 	cat_tac(exp, NEW_TAC_1(TAC_VAR, t));
 	cat_op(exp, exp_l);	 // 拼接exp和exp_l的code
 	cat_op(exp, exp_r);	 // 拼接exp和exp_r的code
+	
 	if (exp_l_addr->data_type == DATA_FLOAT || exp_r_addr->data_type == DATA_FLOAT) {
 		// 对于浮点数的运算，生成调用内部函数的三地址码
 		struct id *func = add_identifier(TAC_TO_FUNC(cal), ID_FUNC, DATA_FLOAT);

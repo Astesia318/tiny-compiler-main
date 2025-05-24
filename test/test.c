@@ -14,16 +14,16 @@ float main()
     a = 0;
     x = 2.6;
     y = 3.4;
-    z = x + y;
-    z = x - y;
-    z = x * y;
-    z = x / y;
-    z = x < y;
-    z = x > y;
-    z = x >= y;
-    z = x <= y;
-    z = x == y;
-    z = x != y;
+    z = x + 2.1;
+    z = x - 2.1;
+    z = x * 2.1;
+    z = x / 2.1;
+    z = x < 2.1;
+    z = x > 2.1;
+    z = x >= 2.1;
+    z = x <= 2.1;
+    z = x == 2.1;
+    z = x != 2.1;
     if(a==1){
         x = a;
         a = x;

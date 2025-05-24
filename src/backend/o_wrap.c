@@ -58,20 +58,20 @@ void asm_code(struct tac *code) {
 
 		// case TAC_INPUT:
 		// 	r = reg_find(code->id_1);
-		// 	input_str(obj_file, "	IN\n");
-		// 	input_str(obj_file, "	LOD R%u,R15\n", r);
+		// 	input_str(obj_file, "\tIN\n");
+		// 	input_str(obj_file, "\tLOD R%u,R15\n", r);
 		// 	rdesc[r].mod = MODIFIED;
 		// 	return;
 
 		// case TAC_OUTPUT:
 		// 	if (code->id_1->id_type == ID_VAR) {
 		// 		r = reg_find(code->id_1);
-		// 		input_str(obj_file, "	LOD R15,R%u\n", r);
-		// 		input_str(obj_file, "	OUTN\n");
+		// 		input_str(obj_file, "\tLOD R15,R%u\n", r);
+		// 		input_str(obj_file, "\tOUTN\n");
 		// 	} else if (code->id_1->id_type == ID_STRING) {
 		// 		r = reg_find(code->id_1);
-		// 		input_str(obj_file, "	LOD R15,R%u\n", r);
-		// 		input_str(obj_file, "	OUTS\n");
+		// 		input_str(obj_file, "\tLOD R15,R%u\n", r);
+		// 		input_str(obj_file, "\tOUTS\n");
 		// 	}
 		// 	return;
 
@@ -90,7 +90,7 @@ void asm_code(struct tac *code) {
 
 		case TAC_ARG:
 			// r = reg_find(code->id_1);
-			// input_str(obj_file, "	STO (R2+%d),R%u\n", tof + oon, r);
+			// input_str(obj_file, "\tSTO (R2+%d),R%u\n", tof + oon, r);
 			// oon += 4;
 			return;
 
@@ -150,8 +150,10 @@ void tac_to_obj() {
 
 	struct tac *cur;
 	for (cur = tac_head; cur != NULL; cur = cur->next) {
-		input_str(obj_file, "\n\t# ");
-		output_tac(obj_file, cur);
+		#if DEBUG_PRINT == 1
+			input_str(obj_file, "\n\t\t\t\t\t\t\t# ");
+			output_tac(obj_file, cur);
+		#endif
 		// input_str(obj_file, "\n");
 		asm_code(cur);
 	}
@@ -167,16 +169,16 @@ void tac_to_obj() {
 // 生成开始段
 void asm_head() {
 	char head[] =
-		"	# head\n"
-		"	.text\n";
+		"\t\t\t\t\t\t\t# head\n"
+		"\t.text\n";
 	input_str(obj_file, "%s", head);
 }
 
 // 生成结束段
 void asm_tail() {
 	char tail[] =
-		"\n	# tail\n"
-		"	.ident \"tiny-compiler\"\n";
+		"\n\t\t\t\t\t\t\t# tail\n"
+		"\t.ident \"tiny-compiler\"\n";
 
 	input_str(obj_file, "%s", tail);
 }
@@ -185,18 +187,21 @@ void asm_tail() {
 void asm_lc(struct id *s) {
 	const char *t = s->name; /* The text */
 	int i;
-	input_str(obj_file, "	.section	.rodata\n");
-	input_str(obj_file, "	.align	%d\n", TYPE_ALIGN(s->data_type));
+	input_str(obj_file, "\t.section	.rodata\n");
+	input_str(obj_file, "\t.align	%d\n", TYPE_ALIGN(s->data_type));
 	input_str(obj_file, ".LC%u:\n", s->label); /* Label for the string */
 	if(s->id_type==ID_STRING){
-		input_str(obj_file, "	.string	\"%s\"\n", s->name);
+		input_str(obj_file, "\t.string	\"%s\"\n", s->name);
 	}
 	else {
+		#if DEBUG_PRINT == 1
+			input_str(obj_file, "\t\t\t\t\t\t\t#	%s\n", t);
+		#endif
 		for (int i = TYPE_SIZE(DATA_DOUBLE) - TYPE_SIZE(s->data_type); i < TYPE_SIZE(DATA_DOUBLE); i += TYPE_SIZE(DATA_FLOAT))
 		{
 			int temp;
 			memcpy(&temp, (void*)(&s->num)+0, TYPE_SIZE(DATA_FLOAT));
-			input_str(obj_file, "	.word	%d\n", temp);
+			input_str(obj_file, "\t.word	%d\n", temp);
 		}
 	}
 }
@@ -213,7 +218,7 @@ void asm_static(void) {
 	// }
 
 	input_str(obj_file, "STATIC:\n");
-	input_str(obj_file, "	DBN 0,%u\n", tos);
+	input_str(obj_file, "\tDBN 0,%u\n", tos);
 	input_str(obj_file, "STACK:\n");
 }
 
