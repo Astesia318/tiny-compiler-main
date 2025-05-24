@@ -26,7 +26,7 @@
 #define R_JP 3
 #define R_TP 4
 #define R_GEN 0
-#define R_NUM 14
+#define R_NUM 15
 
 /* frame */
 #define FORMAL_OFF -0x10 	/* first formal parameter */

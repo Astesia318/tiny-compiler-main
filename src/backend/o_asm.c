@@ -286,7 +286,7 @@ void asm_load_var(struct id *s, const char *r) {
 		U_TYPE_UPPER_IMM("li", r, s->num); // 使用 U_TYPE_UPPER_IMM 宏
 	} else if (s->scope == GLOBAL_TABLE) {
 		int addr_reg = reg_get();
-		U_TYPE_UPPER_IMM("la", reg_name[addr_reg], s->name); // 使用 U_TYPE_UPPER_IMM 宏
+		U_TYPE_UPPER_SYM("la", reg_name[addr_reg], s->name); // 使用 U_TYPE_UPPER_IMM 宏
 		I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), r, reg_name[addr_reg], 0); // 使用 I_TYPE_LOAD 宏
 	} else {
 		I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), r, "s0", s->offset); // 使用 I_TYPE_LOAD 宏
@@ -296,7 +296,7 @@ void asm_load_var(struct id *s, const char *r) {
 void asm_store_var(struct id *s, const char *r) {
 	if (s->scope == GLOBAL_TABLE) {
 		int addr_reg = reg_get();
-		U_TYPE_UPPER_IMM("la", reg_name[addr_reg], s->name); // 使用 U_TYPE_UPPER_IMM 宏
+		U_TYPE_UPPER_SYM("la", reg_name[addr_reg], s->name); // 使用 U_TYPE_UPPER_IMM 宏
 		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->data_type)), r, reg_name[addr_reg], 0); // 使用 S_TYPE_STORE 宏
 	} else {
 		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->data_type)), r, "s0", s->offset); // 使用 S_TYPE_STORE 宏

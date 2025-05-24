@@ -19,7 +19,11 @@
 //li
 #define U_TYPE_UPPER_IMM(op_mnemonic, dest_reg_name, immediate) \
     input_str(obj_file, "    %s %s, %d\n", op_mnemonic, dest_reg_name, immediate)
-//jr 
+//la lla
+#define U_TYPE_UPPER_SYM(op_mnemonic, dest_reg_name, symbol_no) \
+    input_str(obj_file, "    %s %s, .LC%d\n", op_mnemonic, dest_reg_name, symbol_no)
+
+    //jr 
 #define J_TYPE_JUMP_REG(op_mnemonic, dest_reg_name) \
     input_str(obj_file, "    %s %s\n", op_mnemonic, dest_reg_name)
 //call j

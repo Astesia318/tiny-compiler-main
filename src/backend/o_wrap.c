@@ -182,8 +182,6 @@ void asm_tail() {
 }
 
 
-//XXX:没用了/有点用
-// 生成字符串数据段
 void asm_lc(struct id *s) {
 	const char *t = s->name; /* The text */
 	int i;

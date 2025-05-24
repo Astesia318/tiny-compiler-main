@@ -11,7 +11,7 @@
 #include "riscv.h"
 
 /* global var */
-struct rdesc rdesc[R_NUM];
+struct rdesc rdesc[16];
 const char *reg_name[] = {
 	"a5", "a4", "a3", "a2", "a1", "a0", "a6", "a7",
 	"t0", "t1", "t2", "t3", "t4", "t5", "t6",//可分配的
@@ -119,27 +119,21 @@ void asm_load(int r, struct id *s) {
 	}
 
 	/* not in a reg */
-	switch (s->id_type) {
-		case ID_NUM:
-			U_TYPE_UPPER_IMM("li", reg_name[r], s->num); // 使用 U_TYPE_UPPER_IMM 宏
-			break;
-
-		case ID_TEMP:
-		case ID_VAR:
-			if (s->scope == GLOBAL_TABLE) {
-				U_TYPE_UPPER_IMM("la", "a5", s->name); // 使用 U_TYPE_UPPER_IMM 宏
-				I_TYPE_LOAD("lw", reg_name[r], "a5", 0); // 使用 I_TYPE_LOAD 宏
-			} else {
-				I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), reg_name[r], "s0", s->offset); // 使用 I_TYPE_LOAD 宏
-			}
-			break;
-
-		// TODO:
-		// case ID_STRING:
-		// 	input_str(obj_file, "	LOD R%u,L%u\n", reg_name[r], s->label);
-		// 	break;
+	if(ID_IS_GCONST(s->id_type,s->data_type)){//XXX:不知道适不适配string
+		U_TYPE_UPPER_SYM("lla", "a5", s->label); // 使用 U_TYPE_UPPER_IMM 宏
+		I_TYPE_LOAD("lw", reg_name[r], reg_name[r], 0);
 	}
-
+	else if(s->id_type==ID_NUM && s->data_type==DATA_INT){
+		U_TYPE_UPPER_IMM("li", reg_name[r], s->num); // 使用 U_TYPE_UPPER_IMM 宏
+	}
+	else {//TEMP or VAR
+		if (s->scope == GLOBAL_TABLE) {
+			U_TYPE_UPPER_SYM("la", reg_name[r], s->name); // 使用 U_TYPE_UPPER_IMM 宏
+			I_TYPE_LOAD("lw", reg_name[r], reg_name[r], 0); // 使用 I_TYPE_LOAD 宏
+		} else {
+			I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), reg_name[r], "s0", s->offset); // 使用 I_TYPE_LOAD 宏
+		}
+	}
 	// rdesc_fill(r, s, UNMODIFIED);
 }
 // 为符号分配寄存器
@@ -176,7 +170,8 @@ int reg_get(){
 // 寻找符号对应的最晚被修改的寄存器
 int reg_find(struct id *s) {
 	int first_appear;
-
+	if(s->id_type==ID_NUM&&strcmp(s->name,"0")==0)
+		return R_zero;
 	/* already in a register */
 	for (first_appear = R_GEN; first_appear < R_NUM; first_appear++) {
 		if (rdesc[first_appear].var == s) {
