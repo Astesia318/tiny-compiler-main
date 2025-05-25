@@ -10,7 +10,7 @@ struct tac *tac_head;
 static struct tac *arg_list_head;
 static struct block *block_top;
 
-struct op *type_casting(struct id *id_remain, struct id *id_casting){
+struct op *type_casting(struct id *id_remain, struct id *id_casting) {
 	struct op *cast_exp = new_op();
 	
 	int type_target = id_remain->data_type;
@@ -20,7 +20,7 @@ struct op *type_casting(struct id *id_remain, struct id *id_casting){
 	cast_exp->addr = t;
 
 
-	char casting_func[16];
+	char *casting_func=(char*)malloc(16);
 	sprintf(casting_func, "__%s%s%s",
 			type_target == DATA_CHAR ? "fixuns" : 
 			type_target == DATA_INT ? "fix": 
@@ -36,7 +36,9 @@ struct op *type_casting(struct id *id_remain, struct id *id_casting){
 		);
 	struct id *func;
 	NEW_BUILT_IN_FUNC_ID(func, casting_func, type_target);
-	cat_tac(cast_exp, NEW_TAC_1(TAC_ARG, id_casting)); // 生成 arg a
+	
+	cat_tac(cast_exp, NEW_TAC_1(TAC_VAR, t));
+	cat_tac(cast_exp, NEW_TAC_1(TAC_ARG, id_casting)); // 生成 arg id_casting
 	cat_tac(cast_exp, NEW_TAC_2(TAC_CALL, t, func));   // 生成 t1=call func
 	return cast_exp;
 }
@@ -57,7 +59,7 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 	if (exp_l_addr->data_type == DATA_FLOAT || exp_r_addr->data_type == DATA_FLOAT) {
 		// 对于浮点数的运算，生成调用内部函数的三地址码
 
-		if(TYPE_CHECK(exp_l_addr,exp_r_addr)==0){
+		if((TYPE_CHECK(exp_l_addr,exp_r_addr))==0){
 			if(exp_l_addr->data_type==DATA_FLOAT){
 				struct op *cast_exp = type_casting(exp_l_addr, exp_r_addr);
 				exp_r_addr =cast_exp->addr;
@@ -505,7 +507,7 @@ struct op *process_assign(char *name, struct op *exp) {
 	assign_stat->addr = exp_temp;
 	
 	cat_op(assign_stat, exp);
-	if(TYPE_CHECK(var,exp_temp)==0){
+	if((TYPE_CHECK(var,exp_temp))==0){
 		struct op *cast_exp = type_casting(var, exp_temp);
 		exp_temp =cast_exp->addr;
 		cat_op(assign_stat, cast_exp);

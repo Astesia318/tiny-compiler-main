@@ -51,7 +51,7 @@ CFLAGS := -I$(INCDIR) -g
 
 .PHONY: all clean test
 
-all: $(COMPILER_OUT) $(ASM_OUT) $(MACHINE_OUT)
+all: $(COMPILER_OUT)
 
 # Ensure build directory exists
 $(BUILDDIR):
@@ -62,13 +62,13 @@ $(COMPILER_OUT): $(FRONT_SRCS) $(BACK_SRCS) $(LEX_FRONT_SRC) $(YACC_FRONT_SRC) $
 	$(YACC) -d -v -o $(YACC_FRONT_C) $(YACC_FRONT_SRC)
 	$(CC) $(CFLAGS) -o $@ $(LEX_FRONT_C) $(YACC_FRONT_C) $(FRONT_SRCS) $(BACK_SRCS) $(MAIN_SRC)
 
-$(ASM_OUT): $(LEX_ASM_SRC) $(YACC_ASM_SRC) | $(BUILDDIR)
-	$(LEX) -o $(LEX_ASM_C) $(LEX_ASM_SRC)
-	$(YACC) -d -v -o $(YACC_ASM_C) $(YACC_ASM_SRC)
-	$(CC) $(CFLAGS) -o $@ $(LEX_ASM_C) $(YACC_ASM_C)
+# $(ASM_OUT): $(LEX_ASM_SRC) $(YACC_ASM_SRC) | $(BUILDDIR)
+# 	$(LEX) -o $(LEX_ASM_C) $(LEX_ASM_SRC)
+# 	$(YACC) -d -v -o $(YACC_ASM_C) $(YACC_ASM_SRC)
+# 	$(CC) $(CFLAGS) -o $@ $(LEX_ASM_C) $(YACC_ASM_C)
 
-$(MACHINE_OUT): $(MACHINE_SRCS) | $(BUILDDIR)
-	$(CC) $(CFLAGS) -o $@ $(MACHINE_SRCS)
+# $(MACHINE_OUT): $(MACHINE_SRCS) | $(BUILDDIR)
+# 	$(CC) $(CFLAGS) -o $@ $(MACHINE_SRCS)
 
 clean:
 	rm -rf $(BUILDDIR) $(TESTDIR)/*.s $(TESTDIR)/*.x $(TESTDIR)/*.o

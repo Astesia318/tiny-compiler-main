@@ -117,8 +117,8 @@
 )
 #define TYPE_CHECK(id1,id2)   \
     (id1->data_type==id2->data_type) || \
-	(id1->data_type==DATA_CHAR && id2->data_type==DATA_INT) || \
-	(id1->data_type==DATA_INT && id2->data_type==DATA_CHAR)
+	((id1->data_type==DATA_CHAR) && (id2->data_type==DATA_INT)) || \
+	((id1->data_type==DATA_INT) && (id2->data_type==DATA_CHAR))
 
 // 符号
 struct id

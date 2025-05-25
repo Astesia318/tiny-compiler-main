@@ -104,7 +104,7 @@ extern const char *args_name[];
 #define LOCAL_VAR_OFFSET(identifier, _offset)  \
 	do{	\
 		int data_size = TYPE_SIZE(identifier->data_type);	\
-		identifier->scope = 1;	\
+		identifier->scope = LOCAL_TABLE;	\
 		identifier->offset = _offset-data_size;	\
 		_offset-=ALIGN(data_size);	\
 	}while(0)
