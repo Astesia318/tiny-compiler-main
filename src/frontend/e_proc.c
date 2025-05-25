@@ -10,38 +10,6 @@ struct tac *tac_head;
 static struct tac *arg_list_head;
 static struct block *block_top;
 
-struct op *type_casting(struct id *id_remain, struct id *id_casting) {
-	struct op *cast_exp = new_op();
-	
-	int type_target = id_remain->data_type;
-	int type_src = id_casting->data_type;
-
-	struct id *t = new_temp(type_target);	// 分配临时变量
-	cast_exp->addr = t;
-
-
-	char *casting_func=(char*)malloc(16);
-	sprintf(casting_func, "__%s%s%s",
-			type_target == DATA_CHAR ? "fixuns" : 
-			type_target == DATA_INT ? "fix": 
-			type_target == DATA_FLOAT ? "float": ""
-			,
-			type_src == DATA_CHAR ? "unsi" : 
-			type_src == DATA_INT ? "si": 
-			type_src == DATA_FLOAT ? "sf": ""
-			,
-			type_target == DATA_CHAR ? "si" : 
-			type_target == DATA_INT ? "si": 
-			type_target == DATA_FLOAT ? "sf": ""
-		);
-	struct id *func;
-	NEW_BUILT_IN_FUNC_ID(func, casting_func, type_target);
-	
-	cat_tac(cast_exp, NEW_TAC_1(TAC_VAR, t));
-	cat_tac(cast_exp, NEW_TAC_1(TAC_ARG, id_casting)); // 生成 arg id_casting
-	cat_tac(cast_exp, NEW_TAC_2(TAC_CALL, t, func));   // 生成 t1=call func
-	return cast_exp;
-}
 /*****expression*****/
 // 处理形如"a=a op b"的表达式
 struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
@@ -380,7 +348,7 @@ struct op *process_break() {
 	cat_tac(break_stat, NEW_TAC_1(TAC_GOTO, dummy_label));
 
 	if(block_top==NULL){
-		perror("continue not in a loop");
+		perror("break not in a loop");
 	}
 	break_stat->next = block_top->break_stat_head;
 	block_top->break_stat_head = break_stat;
@@ -446,8 +414,10 @@ struct op *process_call(char *name, struct op *arg_list) {
 	struct id *t = new_temp(func->data_type);
 	call_stat->addr = t;
 
+	struct op *cast_arg_list = param_args_type_casting(func->param, arg_list);
+
 	cat_tac(call_stat, NEW_TAC_1(TAC_VAR, t));
-	cat_op(call_stat, arg_list);
+	cat_op(call_stat, cast_arg_list);
 	cat_tac(call_stat, NEW_TAC_2(TAC_CALL, t, func));
 
 	return call_stat;
@@ -536,11 +506,13 @@ struct op *process_function(struct op *function_head, struct op *parameter_list,
 							struct op *block) {
 	struct op *function = new_op();
 
+	function_head->code->id_1->param = parameter_list->code;
+
 	cat_op(function, function_head);
 	cat_op(function, parameter_list);
 	cat_op(function, block);
 	cat_tac(function, NEW_TAC_0(TAC_END));
-
+	
 	return function;
 }
 
@@ -578,4 +550,68 @@ struct op *process_parameter_list(struct op *param_list_pre, int data_type,
 	return parameter_list;
 }
 
+struct op *param_args_type_casting(struct tac* func_param, struct op* args_list) {
+	struct op *cast_args = new_op();
 
+	// 正向遍历 args_list
+	struct tac *arg = args_list->code;
+	// 反向遍历 func_param
+	struct tac *param = func_param;
+	while (param && param->next->type==TAC_PARAM) {
+		param = param->next; // 移动到 func_param 的末尾
+	}
+
+	while (arg && param->type==TAC_PARAM) {
+		// 检查参数类型是否匹配
+		if (TYPE_CHECK(param->id_1, arg->id_1) == 0) {
+			// 如果类型不匹配，进行类型转换
+			struct op *cast_exp = type_casting(param->id_1, arg->id_1);
+			cat_op(cast_args, cast_exp); // 将转换后的代码拼接到 cast_args
+			arg->id_1 = cast_exp->addr;  // 更新 args_list 中的参数
+		}		
+		arg = arg->next;	 // 正向遍历 args_list
+		param = param->prev; // 反向遍历 func_param
+	}
+	//实参太多了
+	if(arg)
+		perror("too many args");
+	// 实参太少了
+	if(param->type==TAC_PARAM)
+		perror("too many params");
+	cat_op(cast_args, args_list);
+
+	return cast_args;
+}
+
+struct op *type_casting(struct id *id_remain, struct id *id_casting) {
+	struct op *cast_exp = new_op();
+	
+	int type_target = id_remain->data_type;
+	int type_src = id_casting->data_type;
+
+	struct id *t = new_temp(type_target);	// 分配临时变量
+	cast_exp->addr = t;
+
+
+	char *casting_func=(char*)malloc(16);
+	sprintf(casting_func, "__%s%s%s",
+			type_target == DATA_CHAR ? "fixuns" : 
+			type_target == DATA_INT ? "fix": 
+			type_target == DATA_FLOAT ? "float": ""
+			,
+			type_src == DATA_CHAR ? "unsi" : 
+			type_src == DATA_INT ? "si": 
+			type_src == DATA_FLOAT ? "sf": ""
+			,
+			type_target == DATA_CHAR ? "si" : 
+			type_target == DATA_INT ? "si": 
+			type_target == DATA_FLOAT ? "sf": ""
+		);
+	struct id *func;
+	NEW_BUILT_IN_FUNC_ID(func, casting_func, type_target);
+	
+	cat_tac(cast_exp, NEW_TAC_1(TAC_VAR, t));
+	cat_tac(cast_exp, NEW_TAC_1(TAC_ARG, id_casting)); // 生成 arg id_casting
+	cat_tac(cast_exp, NEW_TAC_2(TAC_CALL, t, func));   // 生成 t1=call func
+	return cast_exp;
+}

@@ -1,8 +1,8 @@
 // int global;
-float func(float a)
+float func(float a, int x,char y)
 {
     float b;
-    b = a;
+    b = x;
     return b;
 }
 float main()
@@ -16,6 +16,6 @@ float main()
     y = 3.4;
     a = 2;
     x = a + a;  // f2i
-    a = func(a);//i2f f2i
+    a = func(a,1,c);//i2f f2i
     return z;
 }

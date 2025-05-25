@@ -2,6 +2,7 @@
 #define E_PROC_H
 #include "e_tac.h"
 struct op *type_casting(struct id *id_remain, struct id *id_casting);
+struct op *param_args_type_casting(struct tac *func_param, struct op *args_list);
 struct op *process_argument_list(struct op *exp_1);
 struct op *process_expression_list_head(struct op *exp_1);
 struct op *process_expression_list(struct op *exp_1, struct op *exp_2);
