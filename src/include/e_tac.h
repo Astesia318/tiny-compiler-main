@@ -40,12 +40,22 @@
 #define ID_STRING 5	 // 字符串
 
 // 数据类型
-#define NO_DATA -1	   // 无数据类型
-#define DATA_INT 0	   // 整型
-#define DATA_LONG 1	   // 长整型
-#define DATA_FLOAT 2   // 浮点型
-#define DATA_DOUBLE 3  // 双精度浮点型
-#define DATA_CHAR 4	   // 单字符型
+#define PTR_OFFSET 10
+#define NO_DATA -1		 // 无数据类型
+#define DATA_INT 0		 // 整型
+#define DATA_LONG 1		 // 长整型
+#define DATA_FLOAT 2	 // 浮点型
+#define DATA_DOUBLE 3	 // 双精度浮点型
+#define DATA_CHAR 4		 // 单字符型
+#define DATA_PINT 10	 // 整型
+#define DATA_PLONG 11	 // 长整型
+#define DATA_PFLOAT 12	 // 浮点型
+#define DATA_PDOUBLE 13	 // 双精度浮点型
+#define DATA_PCHAR 14	 // 单字符型
+
+#define DATA_IS_POINTER(type) ((type >= DATA_PINT) && (type <= DATA_PCHAR))
+#define POINTER_TO_CONTENT(type) (type - PTR_OFFSET)
+#define CONTENT_TO_POINTER(type) (type + PTR_OFFSET)
 
 // 三地址码类型
 #define TAC_UNDEF -1	   // 未定义
@@ -75,6 +85,8 @@
 #define TAC_LE 27		   // 小于等于
 #define TAC_GT 28		   // 大于
 #define TAC_GE 29		   // 大于等于
+#define TAC_REFERENCE 30   // 引用
+#define TAC_DEREFERENCE 31 // 解引用
 
 #define BUF_ALLOC(buf) char buf[BUF_SIZE] = {0};
 
@@ -93,40 +105,41 @@
 	memset(pointer, 0, (amount) * sizeof(type));
 
 #define NEW_BUILT_IN_FUNC_ID(identifier, func_name, type) \
-	MALLOC_AND_SET_ZERO(identifier, 1, struct id);   \
-	identifier->name = func_name;                    \
-	identifier->id_type = ID_FUNC;                   \
-	identifier->data_type = type;                    \
+	MALLOC_AND_SET_ZERO(identifier, 1, struct id);        \
+	identifier->name = func_name;                         \
+	identifier->id_type = ID_FUNC;                        \
+	identifier->data_type = type;                         \
 	identifier->offset = -1;
 
 #define TAC_IS_CMP(cal) (cal >= TAC_EQ && cal <= TAC_GE)
 #define ID_IS_CONST(id) (id->id_type == ID_NUM || id->id_type == ID_STRING)
-#define ID_IS_GCONST(id_type,data_type) (id_type ==ID_STRING || id_type == ID_NUM && (data_type == DATA_FLOAT || data_type == DATA_DOUBLE))
-#define TAC_TO_FUNC(cal) (	\
-	cal==TAC_PLUS? "__addsf3" :	\
-	cal==TAC_MINUS? "__subsf3" :	\
-	cal==TAC_MULTIPLY? "__mulsf3" :	\
-	cal==TAC_DIVIDE? "__divsf3" :	\
-	cal==TAC_EQ? "__eqsf2" :	\
-	cal==TAC_NE? "__nesf2" :	\
-	cal==TAC_LT? "__ltsf2" :	\
-	cal==TAC_LE? "__lesf2" :	\
-	cal==TAC_GT? "__gtsf2" :	\
-	cal==TAC_GE? "__gesf2" :	\
-	""	\
-)
-#define TYPE_CHECK(id1,id2)   (\
-    (id1->data_type==id2->data_type) || \
-	((id1->data_type==DATA_CHAR) && (id2->data_type==DATA_INT)) || \
-	((id1->data_type==DATA_INT) && (id2->data_type==DATA_CHAR)))
+#define ID_IS_GCONST(id_type, data_type)                                      \
+	(id_type == ID_STRING || id_type == ID_NUM && (data_type == DATA_FLOAT || \
+												   data_type == DATA_DOUBLE))
+#define TAC_TO_FUNC(cal)                \
+	(cal == TAC_PLUS	   ? "__addsf3" \
+	 : cal == TAC_MINUS	   ? "__subsf3" \
+	 : cal == TAC_MULTIPLY ? "__mulsf3" \
+	 : cal == TAC_DIVIDE   ? "__divsf3" \
+	 : cal == TAC_EQ	   ? "__eqsf2"  \
+	 : cal == TAC_NE	   ? "__nesf2"  \
+	 : cal == TAC_LT	   ? "__ltsf2"  \
+	 : cal == TAC_LE	   ? "__lesf2"  \
+	 : cal == TAC_GT	   ? "__gtsf2"  \
+	 : cal == TAC_GE	   ? "__gesf2"  \
+						   : "")
+#define TYPE_CHECK(id1, id2)                                            \
+	((id1->data_type == id2->data_type) ||                              \
+	 ((id1->data_type == DATA_CHAR) && (id2->data_type == DATA_INT)) || \
+	 ((id1->data_type == DATA_INT) && (id2->data_type == DATA_CHAR)))
 
 // 符号
-struct id
-{
+struct id {
 	const char *name;
 	union {
 		int num_int;
-		float num_float;//XXX:默认只实现float了先，process_float中也默认传入DATA_FLOAT了,asm_lc中的取址逻辑也要因此修改
+		float
+			num_float;	// XXX:默认只实现float了先，process_float中也默认传入DATA_FLOAT了,asm_lc中的取址逻辑也要因此修改
 		char num_char;
 	} num;
 	int id_type;
@@ -134,8 +147,9 @@ struct id
 	int scope;
 	int offset;
 	int label;
-	struct tac *param; // ID_func的参数列表，为了实现类型转换
+	struct tac *param;	// ID_func的参数列表，为了实现类型转换
 	struct id *next;
+	struct op *val_stat;
 };
 
 // 三地址码
@@ -190,7 +204,7 @@ struct tac *new_tac(int type, struct id *id_1, struct id *id_2,
 					struct id *id_3);
 struct id *new_temp(int data_type);
 struct id *new_label();
-struct block *new_block();
+struct block *new_block(struct id *label_begin, struct id *label_end);
 
 // 字符串处理
 const char *id_to_str(struct id *id);

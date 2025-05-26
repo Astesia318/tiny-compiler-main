@@ -24,7 +24,7 @@ void yyerror(char* msg);
     int num_int;
     double num_float;
     char num_char;
-    int type;
+    int data_type;
 }
 
 %token <name> IDENTIFIER
@@ -32,11 +32,15 @@ void yyerror(char* msg);
 %token <num_float> NUM_FLOAT
 %token <num_char> NUM_CHAR
 %token <string> TEXT
-%token <type> INT
-%token <type> LONG
-%token <type> FLOAT
-%token <type> DOUBLE
-%token <type> CHAR
+%token <data_type> INT
+%token <data_type> LONG
+%token <data_type> FLOAT
+%token <data_type> DOUBLE
+%token <data_type> CHAR
+%type <name> left_val
+%type <name> right_val
+%type <data_type> complex_type
+%type <data_type> basic_type
 %type <operation> program
 %type <operation> function_declaration_list
 %type <operation> function_declaration
@@ -67,10 +71,9 @@ void yyerror(char* msg);
 %type <operation> inc_expression
 %type <operation> dec_expression
 %type <operation> expression_or_null
-%type <type> data_type
 
 %token EQ NE LT LE GT GE
-%token IF THEN ELSE FI WHILE FOR DO DONE BREAK CONTINUE FUNC INPUT OUTPUT RETURN
+%token IF ELSE WHILE FOR BREAK CONTINUE INPUT OUTPUT RETURN
 
 %left INC DEC
 %left EQ NE LT LE GT GE
@@ -116,18 +119,18 @@ function : function_head '(' parameter_list ')' block
 | error {}
 ;
 
-function_head : data_type IDENTIFIER
+function_head : complex_type IDENTIFIER
                             {
                                 $$ = process_function_head($1,$2);
 	                            reset_table(INTO_LOCAL_TABLE); 
                             }
 ;
 
-parameter_list : data_type IDENTIFIER               
+parameter_list : complex_type IDENTIFIER               
                             {
                                 $$ = process_parameter_list_head($1,$2);
                             }
-| parameter_list ',' data_type IDENTIFIER               
+| parameter_list ',' complex_type IDENTIFIER               
                             {
                                 $$ = process_parameter_list($1,$3,$4);
                             }
@@ -155,7 +158,7 @@ declaration_list :
                             }
 ;
 
-declaration : data_type variable_list ';'
+declaration : complex_type variable_list ';'
                             {
                                 $$ = process_declaration($1,$2);
                             }
@@ -231,11 +234,11 @@ statement : assign_statement ';'
                             }
 ;
 
-assign_statement : IDENTIFIER '=' expression	
+assign_statement : left_val '=' expression	
                             {
                                 $$ = process_assign($1,$3);
                             }
-| IDENTIFIER '=' assign_statement 
+| left_val '=' assign_statement 
                             {
                                 $$ = process_assign($1,$3);
                             }
@@ -342,7 +345,6 @@ argument_list  :
                             }
 | expression_list
                             {
-                                // $$ = cpy_op($1);
                                 $$ = process_argument_list($1);
                             }
 ;
@@ -433,9 +435,9 @@ expression : inc_expression
                             {
                                 $$ = process_char($1);
                             }
-| IDENTIFIER                            
+| right_val
                             {
-                                $$ = process_identifier($1);
+                                $$ = process_rightval($1);
                             }
 ;
 
@@ -469,7 +471,41 @@ expression_or_null : expression
                             }
 ;
 
-data_type : INT
+left_val : IDENTIFIER
+                            {
+                                $$ = $1;                               
+                            }
+| '*' IDENTIFIER
+                            {
+                                $$ = (char*)process_dereference($2);
+                            }
+;
+
+right_val : IDENTIFIER
+                            {
+                                $$ = $1;                               
+                            }
+| '*' IDENTIFIER
+                            {
+                                $$ = (char*)process_dereference($2);
+                            }
+| '&' IDENTIFIER
+                            {
+                                $$ = (char*)process_reference($2);
+                            }
+;
+
+complex_type : basic_type
+                            {
+                                $$ = $1;
+                            }
+| basic_type '*'
+                            {
+                                $$ = $1 + PTR_OFFSET;
+                            }
+;
+
+basic_type : INT
                             {
                                 $$ = DATA_INT;
                             }

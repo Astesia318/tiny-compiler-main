@@ -3,6 +3,7 @@
 #include "e_tac.h"
 struct op *type_casting(struct id *id_remain, struct id *id_casting);
 struct op *param_args_type_casting(struct tac *func_param, struct op *args_list);
+struct op *process_rightval(char *name);
 struct op *process_argument_list(struct op *exp_1);
 struct op *process_expression_list_head(struct op *exp_1);
 struct op *process_expression_list(struct op *exp_1, struct op *exp_2);
@@ -19,6 +20,8 @@ struct op *process_declaration(int data_type, struct op *exp_1);
 struct op *process_variable_list_end(char *name);
 struct op *process_variable_list(struct op *exp_1, char *name);
 struct op *process_assign(char *name, struct op *exp_1);
+const char *process_dereference(char *name);
+const char *process_reference(char *name);
 struct op *process_input(char *name);
 struct op *process_output_variable(char *name);
 struct op *process_output_text(char *name);
