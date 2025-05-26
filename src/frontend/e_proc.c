@@ -21,11 +21,11 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 	struct id *t = new_temp(exp_l->addr->data_type);  // 分配临时变量
 	exp->addr = t;
 	cat_tac(exp, NEW_TAC_1(TAC_VAR, t));
-	cat_op(exp, exp_l);	 // 拼接exp和exp_l的code
-	cat_op(exp, exp_r);	 // 拼接exp和exp_r的code
+	cat_op(exp, exp_l);  // 拼接exp和exp_l的code
+	cat_op(exp, exp_r);  // 拼接exp和exp_r的code
 
 	if (exp_l_addr->data_type == DATA_FLOAT ||
-		exp_r_addr->data_type == DATA_FLOAT) {
+	    exp_r_addr->data_type == DATA_FLOAT) {
 		// 对于浮点数的运算，生成调用内部函数的三地址码
 
 		if ((TYPE_CHECK(exp_l_addr, exp_r_addr)) == 0) {
@@ -45,7 +45,7 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 
 		cat_tac(exp, NEW_TAC_1(TAC_ARG, exp_r_addr));  // 生成 arg b
 		cat_tac(exp, NEW_TAC_1(TAC_ARG, exp_l_addr));  // 生成 arg a
-		cat_tac(exp, NEW_TAC_2(TAC_CALL, t, func));	   // 生成 t1=call func
+		cat_tac(exp, NEW_TAC_2(TAC_CALL, t, func));    // 生成 t1=call func
 		if (TAC_IS_CMP(cal)) {
 			struct id *label_1 = new_label();
 			struct id *label_2 = new_label();
@@ -64,10 +64,10 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 		}
 	} else {
 		cat_tac(
-			exp,
-			NEW_TAC_3(
-				cal, exp->addr, exp_l_addr,
-				exp_r_addr));  // 生成代表目标表达式的三地址码，并拼接至exp的code末尾
+		    exp,
+		    NEW_TAC_3(
+		        cal, exp->addr, exp_l_addr,
+		        exp_r_addr));  // 生成代表目标表达式的三地址码，并拼接至exp的code末尾
 	}
 	return exp;
 }
@@ -90,10 +90,10 @@ struct op *process_negative(struct op *exp) {
 struct op *process_int(int integer) {
 	struct op *int_exp = new_op();
 
-	BUF_ALLOC(buf);	 // 声明一个char数组变量buf，储存符号名
+	BUF_ALLOC(buf);  // 声明一个char数组变量buf，储存符号名
 	sprintf(buf, "%d", integer);
 	struct id *var =
-		add_identifier(buf, ID_NUM, DATA_INT);	// 向符号表添加以buf为名的符号
+	    add_identifier(buf, ID_NUM, DATA_INT);  // 向符号表添加以buf为名的符号
 	var->num.num_int = integer;
 	int_exp->addr = var;
 
@@ -126,13 +126,13 @@ struct op *process_char(char character) {
 }
 
 // 处理右值
-struct op *process_rightval(char *name){
+struct op *process_rightval(char *name) {
 	struct op *id_exp = new_op();
 
 	struct id *var = find_identifier(name);
 	id_exp->addr = var;
-	if(var->val_stat != NULL){
-		cat_op(id_exp,var->val_stat);	
+	if (var->val_stat != NULL) {
+		cat_op(id_exp, var->val_stat);
 	}
 
 	return id_exp;
@@ -212,7 +212,7 @@ struct op *process_expression_list_head(struct op *arg_exp) {
 
 // 处理表达式列表，在调用函数时生成实参
 struct op *process_expression_list(struct op *arg_list_pre,
-								   struct op *arg_exp) {
+                                   struct op *arg_exp) {
 	struct op *exp_list = new_op();
 
 	struct id *exp_temp = arg_exp->addr;  // not *temp var*
@@ -234,7 +234,7 @@ struct op *process_declaration(int data_type, struct op *declaration_exp) {
 
 	struct tac *head = declaration_exp->code;
 	while (
-		head) {	 // 逐个修改包含已声明变量的declaration_exp表达式所含变量的类型
+	    head) {  // 逐个修改包含已声明变量的declaration_exp表达式所含变量的类型
 		head->id_1->data_type = data_type;
 		head = head->next;
 	}
@@ -300,7 +300,7 @@ void block_initialize() {
 
 // 处理for语句块
 struct op *process_for(struct op *initialization_exp, struct op *condition_exp,
-					   struct op *iteration_exp, struct op *block) {
+                       struct op *iteration_exp, struct op *block) {
 	struct op *for_stat = new_op();
 
 	struct id *exp_temp = condition_exp->addr;
@@ -309,13 +309,13 @@ struct op *process_for(struct op *initialization_exp, struct op *condition_exp,
 	cat_op(for_stat, initialization_exp);
 	cat_tac(for_stat, NEW_TAC_1(TAC_LABEL, block_top->label_begin));
 	cat_op(for_stat, condition_exp);
-	if (exp_temp) {	 // 如果condition_exp不为空，则拼接label_2
+	if (exp_temp) {  // 如果condition_exp不为空，则拼接label_2
 		cat_tac(for_stat, NEW_TAC_2(TAC_IFZ, exp_temp, block_top->label_end));
 	}
 	cat_op(for_stat, block);
 	cat_op(for_stat, iteration_exp);
 	cat_tac(for_stat, NEW_TAC_1(TAC_GOTO, block_top->label_begin));
-	if (exp_temp) {	 // 如果condition_exp不为空，则拼接label_2
+	if (exp_temp) {  // 如果condition_exp不为空，则拼接label_2
 		cat_tac(for_stat, NEW_TAC_1(TAC_LABEL, block_top->label_end));
 	}
 
@@ -391,7 +391,7 @@ struct op *process_if_only(struct op *condition_exp, struct op *block) {
 
 // 处理if else语句块
 struct op *process_if_else(struct op *condition_exp, struct op *if_block,
-						   struct op *else_block) {
+                           struct op *else_block) {
 	struct op *if_else_stat = new_op();
 
 	struct id *label_1 = new_label();
@@ -480,8 +480,8 @@ struct op *process_assign(char *name, struct op *exp) {
 	assign_stat->addr = exp_temp;
 
 	cat_op(assign_stat, exp);
-	if (!DATA_IS_POINTER(var->data_type) && var->val_stat != NULL ) {
-		cat_op(assign_stat,var->val_stat);
+	if (!DATA_IS_POINTER(var->data_type) && var->val_stat != NULL) {
+		cat_op(assign_stat, var->val_stat);
 		var->val_stat = NULL;
 	}
 	if ((TYPE_CHECK(var, exp_temp)) == 0) {
@@ -495,16 +495,16 @@ struct op *process_assign(char *name, struct op *exp) {
 }
 
 // 处理被解引用的指针
-const char *process_dereference(char *name){
+const char *process_dereference(char *name) {
 	struct op *pointer_stat = new_op();
 
 	struct id *var = find_identifier(name);
-	if(!DATA_IS_POINTER(var->data_type)){
+	if (!DATA_IS_POINTER(var->data_type)) {
 		perror("data is not pointer");
 		exit(0);
 	}
 
-	struct id *t = new_temp(POINTER_TO_CONTENT(var->data_type));  
+	struct id *t = new_temp(POINTER_TO_CONTENT(var->data_type));
 	cat_tac(pointer_stat, NEW_TAC_1(TAC_VAR, t));
 	cat_tac(pointer_stat, NEW_TAC_2(TAC_DEREFERENCE, t, var));
 	t->val_stat = pointer_stat;
@@ -513,16 +513,16 @@ const char *process_dereference(char *name){
 }
 
 // 处理引用的变量
-const char *process_reference(char *name){
+const char *process_reference(char *name) {
 	struct op *pointer_stat = new_op();
 
 	struct id *var = find_identifier(name);
-	if(DATA_IS_POINTER(var->data_type)){
+	if (DATA_IS_POINTER(var->data_type)) {
 		perror("data is pointer");
 		exit(0);
 	}
 
-	struct id *t = new_temp(CONTENT_TO_POINTER(var->data_type));  
+	struct id *t = new_temp(CONTENT_TO_POINTER(var->data_type));
 	cat_tac(pointer_stat, NEW_TAC_1(TAC_VAR, t));
 	cat_tac(pointer_stat, NEW_TAC_2(TAC_REFERENCE, t, var));
 	t->val_stat = pointer_stat;
@@ -545,7 +545,7 @@ struct op *process_program(struct op *program) {
 
 // 处理函数
 struct op *process_function(struct op *function_head, struct op *parameter_list,
-							struct op *block) {
+                            struct op *block) {
 	struct op *function = new_op();
 
 	function_head->code->id_1->param = parameter_list->code;
@@ -563,7 +563,7 @@ struct op *process_function_head(int data_type, char *name) {
 	struct op *function_head = new_op();
 
 	struct id *func = add_identifier(
-		name, ID_FUNC, data_type);	// 向符号表添加类型为函数的符号
+	    name, ID_FUNC, data_type);  // 向符号表添加类型为函数的符号
 	cat_tac(function_head, NEW_TAC_1(TAC_LABEL, func));
 	cat_tac(function_head, NEW_TAC_0(TAC_BEGIN));
 
@@ -582,7 +582,7 @@ struct op *process_parameter_list_head(int data_type, char *name) {
 
 // 处理函数参数列表，加入标识符
 struct op *process_parameter_list(struct op *param_list_pre, int data_type,
-								  char *name) {
+                                  char *name) {
 	struct op *parameter_list = new_op();
 
 	struct id *var = add_identifier(name, ID_VAR, data_type);
@@ -593,7 +593,7 @@ struct op *process_parameter_list(struct op *param_list_pre, int data_type,
 }
 
 struct op *param_args_type_casting(struct tac *func_param,
-								   struct op *args_list) {
+                                   struct op *args_list) {
 	struct op *cast_args = new_op();
 
 	// 正向遍历 args_list
@@ -610,9 +610,9 @@ struct op *param_args_type_casting(struct tac *func_param,
 			// 如果类型不匹配，进行类型转换
 			struct op *cast_exp = type_casting(param->id_1, arg->id_1);
 			cat_op(cast_args, cast_exp);  // 将转换后的代码拼接到 cast_args
-			arg->id_1 = cast_exp->addr;	  // 更新 args_list 中的参数
+			arg->id_1 = cast_exp->addr;   // 更新 args_list 中的参数
 		}
-		arg = arg->next;	  // 正向遍历 args_list
+		arg = arg->next;      // 正向遍历 args_list
 		param = param->prev;  // 反向遍历 func_param
 	}
 	// 实参太多了
@@ -635,23 +635,23 @@ struct op *type_casting(struct id *id_remain, struct id *id_casting) {
 
 	char *casting_func = (char *)malloc(16);
 	sprintf(casting_func, "__%s%s%s",
-			type_target == DATA_CHAR	? "fixuns"
-			: type_target == DATA_INT	? "fix"
-			: type_target == DATA_FLOAT ? "float"
-										: "",
-			type_src == DATA_CHAR	 ? "unsi"
-			: type_src == DATA_INT	 ? "si"
-			: type_src == DATA_FLOAT ? "sf"
-									 : "",
-			type_target == DATA_CHAR	? "si"
-			: type_target == DATA_INT	? "si"
-			: type_target == DATA_FLOAT ? "sf"
-										: "");
+	        type_target == DATA_CHAR    ? "fixuns"
+	        : type_target == DATA_INT   ? "fix"
+	        : type_target == DATA_FLOAT ? "float"
+	                                    : "",
+	        type_src == DATA_CHAR    ? "unsi"
+	        : type_src == DATA_INT   ? "si"
+	        : type_src == DATA_FLOAT ? "sf"
+	                                 : "",
+	        type_target == DATA_CHAR    ? "si"
+	        : type_target == DATA_INT   ? "si"
+	        : type_target == DATA_FLOAT ? "sf"
+	                                    : "");
 	struct id *func;
 	NEW_BUILT_IN_FUNC_ID(func, casting_func, type_target);
 
 	cat_tac(cast_exp, NEW_TAC_1(TAC_VAR, t));
-	cat_tac(cast_exp, NEW_TAC_1(TAC_ARG, id_casting));	// 生成 arg id_casting
-	cat_tac(cast_exp, NEW_TAC_2(TAC_CALL, t, func));	// 生成 t1=call func
+	cat_tac(cast_exp, NEW_TAC_1(TAC_ARG, id_casting));  // 生成 arg id_casting
+	cat_tac(cast_exp, NEW_TAC_2(TAC_CALL, t, func));    // 生成 t1=call func
 	return cast_exp;
 }
