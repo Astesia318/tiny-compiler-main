@@ -11,15 +11,17 @@
 #include "e_tac.h"
 
 // 生成二元运算对应的汇编代码
-//XXX:默认寄存器a5用来接收结果
+
 void asm_bin(char *op, struct id *a, struct id *b, struct id *c) {
 	//bc都是立即数,直接计算
+	int reg_a = reg_alloc(a);
 	if(b->id_type==ID_NUM&&c->id_type==ID_NUM){
-		U_TYPE_UPPER_IMM("li", reg_name[R_a5], OP_TO_CAL(op, b->num.num_int, c->num.num_int)); // li rd, imm
+		U_TYPE_UPPER_IMM("li", reg_name[reg_a], OP_TO_CAL(op, b->num.num_int, c->num.num_int)); // li rd, imm
 	}
 	//bc其中一个不是立即数
 	else {
 		int reg_b = -1, reg_c = -1;
+		
 		switch(op[0]) {
 			case 'a'://add
 				while (reg_b == reg_c) {//bc有一个为立即数均可使用addi处理
@@ -46,34 +48,30 @@ void asm_bin(char *op, struct id *a, struct id *b, struct id *c) {
 				break;
 		}
 		//op
-		if(reg_b!=-1&&reg_c!=-1)input_str(obj_file, 
-											"\t%s a5,%s,%s\n", 
-											op,
-											reg_name[reg_b],
-											reg_name[reg_c]);
+
+		if(reg_b!=-1&&reg_c!=-1)R_TYPE(op,reg_name[reg_a],reg_name[reg_b],reg_name[reg_c]);
 		else {
-			input_str(obj_file, 
-						"\taddi a5,%s,%d\n", 
-						reg_b!=-1?
-							reg_name[reg_b]:
-							reg_name[reg_c],
-						reg_b!=-1?
-							(op[0]=='s'?
-								-(c->num.num_int):
-								c->num.num_int):
-							b->num.num_int);
+			I_TYPE_ARITH("addi",reg_name[reg_a],
+			reg_b!=-1?
+				reg_name[reg_b]:
+				reg_name[reg_c],
+			reg_b!=-1?
+				(op[0]=='s'?
+					-(c->num.num_int):
+					c->num.num_int):
+				b->num.num_int);
 		}
 	}
 	//store a
-	asm_store_var(a,"a5");
-	rdesc_fill(R_a5,a,MODIFIED);
+	asm_store_var(a,reg_name[reg_a]);
+	rdesc_fill(reg_a,a,MODIFIED);
 }
 
 // 生成比较运算对应的汇编代码
-//XXX:默认寄存器a5用来接收结果，写的太ex了，得想办法简洁些
+//XXX:使用alloc获取res_reg，认为tem变量只会在等式左边出现一次，写的太ex了，得想办法简洁些
 void asm_cmp(int op, struct id *a, struct id *b, struct id *c) {
 	//bc都是立即数,直接计算
-	int res_reg = R_a5;
+	int res_reg = reg_alloc(a);
 	if (b->id_type == ID_NUM && c->id_type == ID_NUM)
 	{
 		OP_TO_CMP(op, b->num.num_int, c->num.num_int) ? 
@@ -145,7 +143,7 @@ void asm_cmp(int op, struct id *a, struct id *b, struct id *c) {
 				case TAC_LT: // a5 < imm_c  => slti a5, a5, imm_c
 					I_TYPE_ARITH("slti", res_n, temp_n, imm_c);
 					break;
-				case TAC_LE: // a5 <= imm_c => slti a5, a5, imm_c + 1;
+				case TAC_LE: // a5 <= imm_c => slti a5, a5, imm_c + 1; xori a5, a5, 1
 					I_TYPE_ARITH("slti", res_n, temp_n, imm_c + 1);
 					break;
 				case TAC_GT: // a5 > imm_c  => slti a5, a5, imm_c + 1; xori a5, a5, 1
@@ -160,7 +158,7 @@ void asm_cmp(int op, struct id *a, struct id *b, struct id *c) {
 		}
 	I_TYPE_ARITH("andi", res_n, res_n, 0xff);
 	asm_store_var(a,reg_name[res_reg]);
-	if(res_reg==R_a5)rdesc_fill(R_a5,a,MODIFIED);
+	if(res_reg!=R_zero)rdesc_fill(res_reg,a,MODIFIED);
 	}
 }
 // 生成条件跳转(ifz)对应的汇编代码
@@ -168,14 +166,15 @@ void asm_cond(char *op, struct id *a, const char *l) {
 	//for (int r = R_GEN; r < R_NUM; r++) asm_write_back(r);
 
 	if (a != NULL) {
-		int r = reg_find(a);
-		B_TYPE_BRANCH(op, reg_name[r], reg_name[R_zero], l); // 使用 B_TYPE_BRANCH 宏
-	} else {
-		J_TYPE_JUMP_PSEUDO(op, l); // 使用 J_TYPE_JUMP_PSEUDO 宏
+		int r=reg_find(a);
+		input_str(obj_file, "	%s %s,zero,.%s\n", op,reg_name[r],l);
+	}
+	else{
+		input_str(obj_file, "	%s .%s\n", op, l);
 	}
 }
 //XXX:需要考虑不同变量的大小，这里默认都是int
-void asm_stack_pivot(struct tac* code) {
+void asm_stack_pivot(struct tac* code){
 	oon = 0;
 	int var_size = 0;
 	int param_size = 0;
@@ -196,26 +195,27 @@ void asm_stack_pivot(struct tac* code) {
 	oon = var_size + param_size + 16;
 	tof = LOCAL_OFF;
 	oof = FORMAL_OFF-var_size;
-	I_TYPE_ARITH("addi", "sp", "sp", -oon);
-	S_TYPE_STORE("sw", "ra", "sp", oon - 4); // 使用 S_TYPE_STORE 宏
-	S_TYPE_STORE("sw", "s0", "sp", oon - 8); // 使用 S_TYPE_STORE 宏
-	I_TYPE_ARITH("addi", "s0", "sp", oon);   // 使用 I_TYPE_ARITH 宏
+	input_str(obj_file, "	addi sp,sp,-%d\n", oon);
+	input_str(obj_file, "	sw ra,%d(sp)\n",oon-4);
+	input_str(obj_file, "	sw s0,%d(sp)\n",oon-8);
+	input_str(obj_file, "	addi s0,sp,%d\n", oon);
 }
-void asm_param(struct tac* code) {
+void asm_param(struct tac*code){
 	int cnt = 0;
 	struct tac *cur = code->next;
 	int data_size;
 	while (cur->type == TAC_PARAM)
 	{
 		LOCAL_VAR_OFFSET(cur->id_1, oof);
-		asm_store_var(cur->id_1, args_name[cnt]); // 使用 asm_store_var
+		// TODO:
+		asm_store_var(cur->id_1, args_name[cnt]);
 		cur = cur->next;
 		cnt++;
 	}
 }
 // 生成函数调用对应的汇编代码
 //XXX:没考虑大于8个参数如何传递
-void asm_call(struct tac* code, struct id *a, struct id *b) {
+void asm_call(struct tac*code,struct id *a, struct id *b) {
 	int r;
 	int cnt = 0;
 	// for (int r = R_GEN; r < R_NUM; r++) asm_write_back(r);
@@ -231,38 +231,40 @@ void asm_call(struct tac* code, struct id *a, struct id *b) {
 	while (cur->type==TAC_ARG)
 	{
 		r++;
-		asm_load_var(cur->id_1, args_name[cnt - r]); // 使用 asm_load_var
+		asm_load_var(cur->id_1, args_name[cnt - r]);
 		cur = cur->next;
 	}
-	J_TYPE_JUMP_PSEUDO("call", b->name); // 使用 J_TYPE_JUMP_PSEUDO 宏
-	if (a != NULL) {
-		asm_store_var(a, reg_name[R_a0]); // 使用 asm_store_var
-		rdesc_fill(R_a0, a, MODIFIED);
+
+	input_str(obj_file, "	call	%s@plt\n", b->name);
+	if (a != NULL)
+	{
+		asm_store_var(a, reg_name[R_a0]);
+		rdesc_fill(R_a0,a,MODIFIED);
 	}
 }
-void asm_label(struct id *a) {
+void asm_label(struct id *a){
 	for (int r = R_GEN; r < R_NUM; r++) rdesc_clear_all(r);
 	if(a->id_type==ID_LABEL){
-		input_str(obj_file, "%s:\n", a->name);
+		input_str(obj_file, ".%s:\n", a->name);
 	}
 	else if(a->id_type==ID_FUNC){
-		input_str(obj_file, "\t.align	2\n");
-		input_str(obj_file, "\t.globl	%s\n", a->name);
-		input_str(obj_file, "\t.type	%s,@function\n", a->name);
+		input_str(obj_file, "	.align	2\n");
+		input_str(obj_file, "	.globl	%s\n", a->name);
+		input_str(obj_file, "	.type	%s,@function\n", a->name);
 		input_str(obj_file, "%s:\n", a->name);
 	}
 }
 
-void asm_gvar(struct id *a) {
+void asm_gvar(struct id *a){
 	int data_size = TYPE_SIZE(a->data_type);
 	a->scope = 0; /* global var */
-	input_str(obj_file, "\t.globl	%s\n", a->name);
-	input_str(obj_file, "\t.bss\n");
-	input_str(obj_file, "\t.align	%d\n",TYPE_ALIGN(a->data_type));
-	input_str(obj_file, "\t.type	%s,@object\n", a->name);
-	input_str(obj_file, "\t.size %s, %d\n", a->name, data_size);
+	input_str(obj_file, "	.globl	%s\n", a->name);
+	input_str(obj_file, "	.bss\n");
+	input_str(obj_file, "	.align	%d\n",TYPE_ALIGN(a->data_type));
+	input_str(obj_file, "	.type	%s,@object\n", a->name);
+	input_str(obj_file, "	.size %s, %d\n", a->name, data_size);
 	input_str(obj_file, "%s:\n", a->name);
-	input_str(obj_file, "\t.zero	%d", data_size); 
+	input_str(obj_file, "	.zero	%d", data_size);//XXX:需要实现全局变量赋值后作改动
 }
 // 生成函数返回对应的汇编代码
 void asm_return(struct id *a) {
@@ -272,12 +274,12 @@ void asm_return(struct id *a) {
 	if (a != NULL) /* return value */
 	{
 		int r=reg_find(a);
-		PSEUDO_2_REG("mv", reg_name[R_a0], reg_name[r]); // 使用 PSEUDO_2_REG 宏
+		input_str(obj_file, "	mv %s,%s\n", reg_name[R_a0],reg_name[r]);
 	}
 
-	I_TYPE_LOAD("lw", "ra", "sp", oon - 4); // 使用 I_TYPE_LOAD 宏
-	I_TYPE_LOAD("lw", "s0", "sp", oon - 8); // 使用 I_TYPE_LOAD 宏
-	I_TYPE_ARITH("addi", "sp", "sp", oon);  // 使用 I_TYPE_ARITH 宏
-	J_TYPE_JUMP_REG("jr", "ra");           // 使用 J_TYPE_JUMP_REG 宏
-}
+	input_str(obj_file, "	lw ra,%d(sp)\n",oon-4);
+	input_str(obj_file, "	lw s0,%d(sp)\n",oon-8);
+	input_str(obj_file, "	addi sp,sp,%d\n", oon);
+	input_str(obj_file, "	jr ra\n");
 
+}
