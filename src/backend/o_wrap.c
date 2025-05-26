@@ -2,10 +2,10 @@
 #include "o_wrap.h"
 
 #include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 #include <time.h>
 
 #include "e_tac.h"
@@ -52,28 +52,31 @@ void asm_code(struct tac *code) {
 
 		case TAC_ASSIGN:
 			r = reg_find(code->id_2);
-			if(code->id_1->data_type==code->id_2->data_type)rdesc_fill(r, code->id_1, MODIFIED);//只有类型相同时覆盖寄存器描述符，防止未截断错误
+			if (code->id_1->data_type == code->id_2->data_type)
+				rdesc_fill(
+				    r, code->id_1,
+				    MODIFIED);  // 只有类型相同时覆盖寄存器描述符，防止未截断错误
 			asm_store_var(code->id_1, reg_name[r]);
 			return;
 
-		// case TAC_INPUT:
-		// 	r = reg_find(code->id_1);
-		// 	input_str(obj_file, "\tIN\n");
-		// 	input_str(obj_file, "\tLOD R%u,R15\n", r);
-		// 	rdesc[r].mod = MODIFIED;
-		// 	return;
+			// case TAC_INPUT:
+			// 	r = reg_find(code->id_1);
+			// 	input_str(obj_file, "\tIN\n");
+			// 	input_str(obj_file, "\tLOD R%u,R15\n", r);
+			// 	rdesc[r].mod = MODIFIED;
+			// 	return;
 
-		// case TAC_OUTPUT:
-		// 	if (code->id_1->id_type == ID_VAR) {
-		// 		r = reg_find(code->id_1);
-		// 		input_str(obj_file, "\tLOD R15,R%u\n", r);
-		// 		input_str(obj_file, "\tOUTN\n");
-		// 	} else if (code->id_1->id_type == ID_STRING) {
-		// 		r = reg_find(code->id_1);
-		// 		input_str(obj_file, "\tLOD R15,R%u\n", r);
-		// 		input_str(obj_file, "\tOUTS\n");
-		// 	}
-		// 	return;
+			// case TAC_OUTPUT:
+			// 	if (code->id_1->id_type == ID_VAR) {
+			// 		r = reg_find(code->id_1);
+			// 		input_str(obj_file, "\tLOD R15,R%u\n", r);
+			// 		input_str(obj_file, "\tOUTN\n");
+			// 	} else if (code->id_1->id_type == ID_STRING) {
+			// 		r = reg_find(code->id_1);
+			// 		input_str(obj_file, "\tLOD R15,R%u\n", r);
+			// 		input_str(obj_file, "\tOUTS\n");
+			// 	}
+			// 	return;
 
 		case TAC_GOTO:
 			asm_cond("j", NULL, code->id_1->name);
@@ -84,7 +87,7 @@ void asm_code(struct tac *code) {
 			return;
 
 		case TAC_LABEL:
-			//for (int r = R_GEN; r < R_NUM; r++) asm_write_back(r);
+			// for (int r = R_GEN; r < R_NUM; r++) asm_write_back(r);
 			asm_label(code->id_1);
 			return;
 
@@ -95,33 +98,30 @@ void asm_code(struct tac *code) {
 			return;
 
 		case TAC_PARAM:
-			
+
 			return;
 
 		case TAC_CALL:
-			asm_call(code,code->id_1, code->id_2);
+			asm_call(code, code->id_1, code->id_2);
 			return;
 
 		case TAC_BEGIN:
-			//栈帧迁移
+			// 栈帧迁移
 			scope = 1;
 			asm_stack_pivot(code);
 			asm_param(code);
 			return;
 
 		case TAC_END:
-			//asm_return(NULL);
+			// asm_return(NULL);
 			scope = 0;
 			return;
 
 		case TAC_VAR:
-			
-			if (scope)
-			{
+
+			if (scope) {
 				LOCAL_VAR_OFFSET(code->id_1, tof);
-			}
-			else
-			{
+			} else {
 				asm_gvar(code->id_1);
 			}
 			return;
@@ -150,15 +150,15 @@ void tac_to_obj() {
 
 	struct tac *cur;
 	for (cur = tac_head; cur != NULL; cur = cur->next) {
-		#if DEBUG_PRINT == 1
-			input_str(obj_file, "\n\t\t\t\t\t\t\t# ");
-			output_tac(obj_file, cur);
-		#endif
+#if DEBUG_PRINT == 1
+		input_str(obj_file, "\n\t\t\t\t\t\t\t# ");
+		output_tac(obj_file, cur);
+#endif
 		// input_str(obj_file, "\n");
 		asm_code(cur);
 	}
-	for (struct id *gconst = id_global; gconst != NULL;gconst=gconst->next){
-		if(ID_IS_GCONST(gconst->id_type,gconst->data_type)){
+	for (struct id *gconst = id_global; gconst != NULL; gconst = gconst->next) {
+		if (ID_IS_GCONST(gconst->id_type, gconst->data_type)) {
 			asm_lc(gconst);
 		}
 	}
@@ -169,20 +169,19 @@ void tac_to_obj() {
 // 生成开始段
 void asm_head() {
 	char head[] =
-		"\t\t\t\t\t\t\t# head\n"
-		"\t.text\n";
+	    "\t\t\t\t\t\t\t# head\n"
+	    "\t.text\n";
 	input_str(obj_file, "%s", head);
 }
 
 // 生成结束段
 void asm_tail() {
 	char tail[] =
-		"\n\t\t\t\t\t\t\t# tail\n"
-		"\t.ident \"tiny-compiler\"\n";
+	    "\n\t\t\t\t\t\t\t# tail\n"
+	    "\t.ident \"tiny-compiler\"\n";
 
 	input_str(obj_file, "%s", tail);
 }
-
 
 void asm_lc(struct id *s) {
 	const char *t = s->name; /* The text */
@@ -190,24 +189,23 @@ void asm_lc(struct id *s) {
 	input_str(obj_file, "\t.section	.rodata\n");
 	input_str(obj_file, "\t.align	%d\n", TYPE_ALIGN(s->data_type));
 	input_str(obj_file, ".LC%u:\n", s->label); /* Label for the string */
-	if(s->id_type==ID_STRING){
+	if (s->id_type == ID_STRING) {
 		input_str(obj_file, "\t.string	\"%s\"\n", s->name);
-	}
-	else {
-		#if DEBUG_PRINT == 1
-			input_str(obj_file, "\t\t\t\t\t\t\t#	%s\n", t);
-		#endif
-		for (int i = TYPE_SIZE(DATA_DOUBLE) - TYPE_SIZE(s->data_type); i < TYPE_SIZE(DATA_DOUBLE); i += TYPE_SIZE(DATA_FLOAT))
-		{
+	} else {
+#if DEBUG_PRINT == 1
+		input_str(obj_file, "\t\t\t\t\t\t\t#	%s\n", t);
+#endif
+		for (int i = TYPE_SIZE(DATA_DOUBLE) - TYPE_SIZE(s->data_type);
+		     i < TYPE_SIZE(DATA_DOUBLE); i += TYPE_SIZE(DATA_FLOAT)) {
 			int temp;
-			memcpy(&temp, (void*)(&s->num)+0, TYPE_SIZE(DATA_FLOAT));
+			memcpy(&temp, (void *)(&s->num) + 0, TYPE_SIZE(DATA_FLOAT));
 			input_str(obj_file, "\t.word	%d\n", temp);
 		}
 	}
 }
 
 // 生成静态数据段
-//XXX:没用了
+// XXX:没用了
 void asm_static(void) {
 	int i;
 
@@ -221,4 +219,3 @@ void asm_static(void) {
 	input_str(obj_file, "\tDBN 0,%u\n", tos);
 	input_str(obj_file, "STACK:\n");
 }
-

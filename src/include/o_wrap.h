@@ -12,4 +12,4 @@ void asm_head();
 void asm_tail();
 void asm_static(void);
 void asm_lc(struct id *s);
-#endif	// CODE_GENERATOR_H
+#endif  // CODE_GENERATOR_H
