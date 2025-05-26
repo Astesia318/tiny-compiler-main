@@ -4,6 +4,7 @@ tac.txt*
 # test.c.*
 test/*.x
 test/*.s
+test/*.o
 *.patch
 
 # reference from ysj
