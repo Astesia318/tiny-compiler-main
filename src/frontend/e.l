@@ -32,19 +32,11 @@
 
 "if"  {  return IF;  }
 
-"then"  {  return THEN;  }
-
 "else"  {  return ELSE;  }
-
-"fi"  {  return FI;  }
 
 "while"  {  return WHILE;  }
 
 "for"  {  return FOR;  }
-
-"do"  {  return DO;  }
-
-"done"  {  return DONE;  }
 
 [A-Za-z]([A-Za-z]|[0-9])*  {  yylval.name = strdup(yytext); return IDENTIFIER;  }
 
