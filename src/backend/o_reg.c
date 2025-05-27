@@ -82,20 +82,23 @@ void rdesc_fill(int r, struct id *s, int mod) {
 }
 // 写回寄存器内容至内存
 // XXX:没用了/有点用
+// hjj: 不能直接用STO&LOD，先注释掉。
 void asm_write_back(int r) {
-	if ((rdesc[r].var != NULL) && rdesc[r].mod) {
-		if (rdesc[r].var->scope == 1) /* local var */
-		{
-			input_str(obj_file, "\tSTO (R%u+%u),R%u\n", R_BP,
-			          rdesc[r].var->offset, r);
-		} else /* global var */
-		{
-			input_str(obj_file, "\tLOD R%u,STATIC\n", R_TP);
-			input_str(obj_file, "\tSTO (R%u+%u),R%u\n", R_TP,
-			          rdesc[r].var->offset, r);
-		}
-		rdesc[r].mod = UNMODIFIED;
-	}
+	// if ((rdesc[r].var != NULL) && rdesc[r].mod) {
+	// 	if (rdesc[r].var->scope == 1) /* local var */
+	// 	{
+	// 		input_str(obj_file, "\tSTO (R%u+%u),R%u\n", R_BP,
+	// 		          rdesc[r].var->offset, r);
+	// 	} else /* global var */
+	// 	{
+	// 		input_str(obj_file, "\tLOD R%u,STATIC\n", R_TP);
+	// 		input_str(obj_file, "\tSTO (R%u+%u),R%u\n", R_TP,
+	// 		          rdesc[r].var->offset, r);
+	// 	}
+	// 	rdesc[r].mod = UNMODIFIED;
+	// }
+	perror("tbd write back");
+	exit(0);
 }
 
 // 加载符号到寄存器

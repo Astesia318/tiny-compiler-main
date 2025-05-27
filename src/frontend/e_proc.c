@@ -133,6 +133,7 @@ struct op *process_rightval(char *name) {
 	id_exp->addr = var;
 	if (var->val_stat != NULL) {
 		cat_op(id_exp, var->val_stat);
+		var->val_stat = NULL;
 	}
 
 	return id_exp;
@@ -481,8 +482,11 @@ struct op *process_assign(char *name, struct op *exp) {
 
 	cat_op(assign_stat, exp);
 	if (!DATA_IS_POINTER(var->data_type) && var->val_stat != NULL) {
+		printf("handle derefer...\n");
 		cat_op(assign_stat, var->val_stat);
+		source_to_tac(NULL,var->val_stat->code);
 		var->val_stat = NULL;
+		printf("handle derefer done\n");
 	}
 	if ((TYPE_CHECK(var, exp_temp)) == 0) {
 		struct op *cast_exp = type_casting(var, exp_temp);
@@ -490,6 +494,7 @@ struct op *process_assign(char *name, struct op *exp) {
 		cat_op(assign_stat, cast_exp);
 	}
 	cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, var, exp_temp));
+	source_to_tac(NULL,assign_stat->code);
 
 	return assign_stat;
 }

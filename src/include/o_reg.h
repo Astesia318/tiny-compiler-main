@@ -43,6 +43,8 @@
 
 #include <stdio.h>
 
+#include "e_tac.h"
+
 // 寄存器描述符结构
 struct rdesc {
 	struct id *var;  // 当前寄存器存储的变量
@@ -70,23 +72,25 @@ extern const char *args_name[];
 #define BYTE 1
 
 #define TYPE_SIZE(data_type)                                                 \
-	((data_type) == DATA_INT     ? 4                                         \
-	 : (data_type) == DATA_LONG  ? 4                                         \
-	 : (data_type) == DATA_FLOAT ? 4                                         \
-	 : (data_type) == DATA_CHAR  ? 1                                         \
-	 : (data_type) == DATA_DOUBLE                                            \
-	     ? 8                                                                 \
+	((data_type) == DATA_INT      ? 4                                        \
+	 : (data_type) == DATA_LONG   ? 4                                        \
+	 : (data_type) == DATA_FLOAT  ? 4                                        \
+	 : (data_type) == DATA_CHAR   ? 1                                        \
+	 : (data_type) == DATA_DOUBLE ? 8                                        \
+	 : (DATA_IS_POINTER(data_type))                                          \
+	     ? 4                                                                 \
 	     : -1 /* 或者返回一个错误码，比如 -1, 或者 ((void)0) 引发编译错误 */ \
 	)
 // XXX:这里认为no_data是string
 #define TYPE_ALIGN(data_type)                                                \
-	((data_type) == NO_DATA      ? 2                                         \
-	 : (data_type) == DATA_INT   ? 2                                         \
-	 : (data_type) == DATA_LONG  ? 2                                         \
-	 : (data_type) == DATA_FLOAT ? 2                                         \
-	 : (data_type) == DATA_CHAR  ? 1                                         \
-	 : (data_type) == DATA_DOUBLE                                            \
-	     ? 3                                                                 \
+	((data_type) == NO_DATA       ? 2                                        \
+	 : (data_type) == DATA_INT    ? 2                                        \
+	 : (data_type) == DATA_LONG   ? 2                                        \
+	 : (data_type) == DATA_FLOAT  ? 2                                        \
+	 : (data_type) == DATA_CHAR   ? 1                                        \
+	 : (data_type) == DATA_DOUBLE ? 3                                        \
+	 : (DATA_IS_POINTER(data_type))                                          \
+	     ? 2                                                                 \
 	     : -1 /* 或者返回一个错误码，比如 -1, 或者 ((void)0) 引发编译错误 */ \
 	)
 #define max(a, b) (a > b ? a : b)
