@@ -73,8 +73,7 @@ void asm_cmp(int op, struct id *a, struct id *b, struct id *c) {
 	int res_reg = reg_alloc(a);
 	if (b->id_type == ID_NUM && c->id_type == ID_NUM) {
 		OP_TO_CMP(op, b->num.num_int, c->num.num_int)
-		    ? U_TYPE_UPPER_IMM("li", reg_name[res_reg], 1)
-		    :  // li rd,1
+		? U_TYPE_UPPER_IMM("li", reg_name[res_reg], 1) :  // li rd,1
 		    (res_reg = R_zero);
 	}
 	// bc其中一个不是立即数
@@ -174,6 +173,7 @@ void asm_cmp(int op, struct id *a, struct id *b, struct id *c) {
 		if (res_reg != R_zero) rdesc_fill(res_reg, a, MODIFIED);
 	}
 }
+
 // 生成条件跳转(ifz)对应的汇编代码
 void asm_cond(char *op, struct id *a, const char *l) {
 	// for (int r = R_GEN; r < R_NUM; r++) asm_write_back(r);
@@ -185,6 +185,24 @@ void asm_cond(char *op, struct id *a, const char *l) {
 		input_str(obj_file, "	%s .%s\n", op, l);
 	}
 }
+
+void asm_refer(struct id *pointer, struct id *var_pointed) {
+	int pointer_r = reg_find(pointer);
+	if (var_pointed->scope == GLOBAL_TABLE) {
+		U_TYPE_UPPER_SYM("la", reg_name[pointer_r], var_pointed->name);
+	} else {
+		I_TYPE_ARITH("addi", reg_name[pointer_r], "s0", var_pointed->offset);
+	}
+}
+
+void asm_derefer(struct id *var, struct id *pointer) {
+	printf("derefering\n");
+	int var_r = reg_find(var);
+	int pointer_r = reg_find(pointer);
+	I_TYPE_LOAD("lw", reg_name[var_r], 0, reg_name[pointer_r]);
+	printf("derefered\n");
+}
+
 // XXX:需要考虑不同变量的大小，这里默认都是int
 void asm_stack_pivot(struct tac *code) {
 	oon = 0;

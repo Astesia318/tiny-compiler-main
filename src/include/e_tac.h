@@ -3,6 +3,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include "config.h"
 
 // 常量定义
 #define MAX 100        // 最大值
@@ -132,6 +133,19 @@
 	((id1->data_type == id2->data_type) ||                              \
 	 ((id1->data_type == DATA_CHAR) && (id2->data_type == DATA_INT)) || \
 	 ((id1->data_type == DATA_INT) && (id2->data_type == DATA_CHAR)))
+
+#ifdef HJJ_DEBUG
+#define PRINT_3(string, var_1, var_2, var_3) printf(string, var_1, var_2, var_3)
+#define PRINT_2(string, var_1, var_2) printf(string, var_1, var_2)
+#define PRINT_1(string, var_1) printf(string, var_1)
+#define PRINT_0(string) printf(string)
+#else
+#define PRINT_3(string, var_1, var_2, var_3) \
+	fprintf(f, string, var_1, var_2, var_2)
+#define PRINT_2(string, var_1, var_2) fprintf(f, string, var_1, var_2)
+#define PRINT_1(string, var_1) fprintf(f, string, var_1)
+#define PRINT_0(string) fprintf(f, string)
+#endif
 
 // 符号
 struct id {

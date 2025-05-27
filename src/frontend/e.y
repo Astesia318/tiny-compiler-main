@@ -471,27 +471,27 @@ expression_or_null : expression
                             }
 ;
 
-left_val : IDENTIFIER
-                            {
-                                $$ = $1;                               
-                            }
-| '*' IDENTIFIER
+left_val : '*' IDENTIFIER
                             {
                                 $$ = (char*)process_dereference($2);
                             }
-;
-
-right_val : IDENTIFIER
+| IDENTIFIER
                             {
                                 $$ = $1;                               
                             }
-| '*' IDENTIFIER
+;
+
+right_val : '*' IDENTIFIER
                             {
                                 $$ = (char*)process_dereference($2);
                             }
 | '&' IDENTIFIER
                             {
                                 $$ = (char*)process_reference($2);
+                            }
+| IDENTIFIER
+                            {
+                                $$ = $1;                               
                             }
 ;
 

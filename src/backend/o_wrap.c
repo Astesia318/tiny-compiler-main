@@ -78,6 +78,14 @@ void asm_code(struct tac *code) {
 			// 	}
 			// 	return;
 
+		case TAC_REFERENCE:
+			asm_refer(code->id_1, code->id_2);
+			return;
+
+		case TAC_DEREFERENCE:
+			asm_derefer(code->id_1, code->id_2);
+			return;
+
 		case TAC_GOTO:
 			asm_cond("j", NULL, code->id_1->name);
 			return;
@@ -151,7 +159,7 @@ void tac_to_obj() {
 	struct tac *cur;
 	for (cur = tac_head; cur != NULL; cur = cur->next) {
 #if DEBUG_PRINT == 1
-		input_str(obj_file, "\n\t\t\t\t\t\t\t# ");
+		input_str(obj_file, "\t\t\t\t\t\t\t# ");
 		output_tac(obj_file, cur);
 #endif
 		// input_str(obj_file, "\n");
