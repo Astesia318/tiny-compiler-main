@@ -14,6 +14,7 @@ static struct block *block_top;
 // 处理形如"a=a op b"的表达式
 struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 	struct op *exp = new_op();
+	if (exp_l == NUM_ZERO) exp_l = process_int(0);
 
 	struct id *exp_l_addr = exp_l->addr;
 	struct id *exp_r_addr = exp_r->addr;
@@ -23,6 +24,24 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 	cat_tac(exp, NEW_TAC_1(TAC_VAR, t));
 	cat_op(exp, exp_l);  // 拼接exp和exp_l的code
 	cat_op(exp, exp_r);  // 拼接exp和exp_r的code
+
+	if (DATA_IS_REF(exp_l_addr->data_type)) {
+		struct id *tl = new_temp(REF_TO_CONTENT(exp_l_addr->data_type));
+
+		cat_tac(exp, NEW_TAC_1(TAC_VAR, tl));
+		cat_tac(exp, NEW_TAC_2(TAC_DEREFER_GET, tl, exp_l_addr));
+
+		exp_l_addr = tl;
+		t->data_type = tl->data_type;
+	}
+	if (DATA_IS_REF(exp_r_addr->data_type)) {
+		struct id *tr = new_temp(REF_TO_CONTENT(exp_r_addr->data_type));
+
+		cat_tac(exp, NEW_TAC_1(TAC_VAR, tr));
+		cat_tac(exp, NEW_TAC_2(TAC_DEREFER_GET, tr, exp_r_addr));
+
+		exp_r_addr = tr;
+	}
 
 	if (exp_l_addr->data_type == DATA_FLOAT ||
 	    exp_r_addr->data_type == DATA_FLOAT) {
@@ -135,6 +154,10 @@ struct op *process_rightval(char *name) {
 		cat_op(id_exp, var->reference_stat);
 		var->reference_stat = NULL;
 	}
+	if (var->dereference_stat != NULL) {
+		cat_op(id_exp, var->dereference_stat);
+		var->dereference_stat = NULL;
+	}
 
 	return id_exp;
 }
@@ -193,6 +216,8 @@ struct op *process_argument_list(struct op *raw_exp_list) {
 
 	cat_op(argument_list, raw_exp_list);
 	cat_tac(argument_list, arg_list_head);
+
+	struct tac *arg = arg_list_head;
 
 	return argument_list;
 }
@@ -418,7 +443,9 @@ struct op *process_call(char *name, struct op *arg_list) {
 	struct id *t = new_temp(func->data_type);
 	call_stat->addr = t;
 
-	struct op *cast_arg_list = param_args_type_casting(func->param, arg_list);
+	struct tac *arg = arg_list->code;
+	struct op *cast_arg_list =
+	    param_args_type_casting(func->func_param, arg_list);
 
 	cat_tac(call_stat, NEW_TAC_1(TAC_VAR, t));
 	cat_op(call_stat, cast_arg_list);
@@ -478,25 +505,36 @@ struct op *process_assign(char *name, struct op *exp) {
 
 	struct id *var = find_identifier(name);
 	struct id *exp_temp = exp->addr;
+	struct id *t;  // used in ref
 	assign_stat->addr = exp_temp;
 
 	cat_op(assign_stat, exp);
-	if (var->reference_stat != NULL) {
-		if (DATA_IS_POINTER(var->data_type)) {  // hjj: 类型检查，以后可能要改掉
-			perror("prohibit referencing a pointer");
-			exit(0);
-		}
-		cat_op(assign_stat, var->reference_stat);
-		var->reference_stat = NULL;
+	if (DATA_IS_REF(var->data_type)) {
+		t = new_temp(REF_TO_POINTER(var->data_type));
+
+		cat_tac(exp, NEW_TAC_1(TAC_VAR, t));
+		cat_tac(exp, NEW_TAC_2(TAC_REFER, t, var));
 	}
-	if ((TYPE_CHECK(var, exp_temp)) == 0) {
+	if ((TYPE_CHECK(var, exp_temp)) == 0 &&
+	    POINTER_TO_CONTENT(var->data_type) != exp_temp->data_type &&
+	    REF_TO_CONTENT(var->data_type) != exp_temp->data_type) {
 		struct op *cast_exp = type_casting(var, exp_temp);
 		exp_temp = cast_exp->addr;
 		cat_op(assign_stat, cast_exp);
 	}
 	if (var->dereference_stat != NULL) {
-		var->dereference_stat->code->id_2 = exp_temp;  // 将占位的NULL改掉
+		if (!DATA_IS_POINTER(
+		        var->data_type)) {  // hjj: 类型检查，以后可能要改掉
+			perror("prohibit dereferencing a nonpointer");
+			exit(0);
+		}
+		cat_tac(var->dereference_stat,
+		        NEW_TAC_2(TAC_DEREFER_PUT, var->dereference_stat->code->id_1,
+		                  exp_temp));
 		cat_op(assign_stat, var->dereference_stat);
+		var->dereference_stat = NULL;
+	} else if (DATA_IS_REF(var->data_type)) {
+		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, t, exp_temp));
 	} else {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, var, exp_temp));
 	}
@@ -504,23 +542,37 @@ struct op *process_assign(char *name, struct op *exp) {
 	return assign_stat;
 }
 
-// 处理被解引用的指针
-const char *process_dereference(char *name) {
-	struct op *pointer_stat = new_op();
+// 处理被解引用并向内赋值的指针
+const char *process_derefer_put(char *name) {
 	struct op *content_stat = new_op();
 
 	struct id *var = find_identifier(name);
 	if (!DATA_IS_POINTER(var->data_type)) {
-		perror("data is not pointer");
+		perror("data is not a pointer");
+		exit(0);
+	}
+
+	struct id *t = new_temp(var->data_type);
+	cat_tac(content_stat, NEW_TAC_1(TAC_VAR, t));
+	cat_tac(content_stat, NEW_TAC_2(TAC_REFER, t, var));
+	t->dereference_stat = content_stat;
+
+	return t->name;
+}
+
+// 处理被解引用并从内取值的指针
+const char *process_derefer_get(char *name) {
+	struct op *content_stat = new_op();
+
+	struct id *var = find_identifier(name);
+	if (!DATA_IS_POINTER(var->data_type)) {
+		perror("data is not a pointer");
 		exit(0);
 	}
 
 	struct id *t = new_temp(POINTER_TO_CONTENT(var->data_type));
-	cat_tac(pointer_stat, NEW_TAC_1(TAC_VAR, t));
-	cat_tac(pointer_stat, NEW_TAC_2(TAC_ASSIGN, t, var));
-	cat_tac(content_stat,
-	        NEW_TAC_2(TAC_DEREFERENCE, t, NULL));  // NULL仅起到占位的作用
-	t->reference_stat = pointer_stat;
+	cat_tac(content_stat, NEW_TAC_1(TAC_VAR, t));
+	cat_tac(content_stat, NEW_TAC_2(TAC_DEREFER_GET, t, var));
 	t->dereference_stat = content_stat;
 
 	return t->name;
@@ -532,13 +584,13 @@ const char *process_reference(char *name) {
 
 	struct id *var = find_identifier(name);
 	if (DATA_IS_POINTER(var->data_type)) {
-		perror("data is pointer");
+		perror("data is a pointer");
 		exit(0);
 	}
 
 	struct id *t = new_temp(CONTENT_TO_POINTER(var->data_type));
 	cat_tac(pointer_stat, NEW_TAC_1(TAC_VAR, t));
-	cat_tac(pointer_stat, NEW_TAC_2(TAC_REFERENCE, t, var));
+	cat_tac(pointer_stat, NEW_TAC_2(TAC_REFER, t, var));
 	t->reference_stat = pointer_stat;
 
 	return t->name;
@@ -562,7 +614,7 @@ struct op *process_function(struct op *function_head, struct op *parameter_list,
                             struct op *block) {
 	struct op *function = new_op();
 
-	function_head->code->id_1->param = parameter_list->code;
+	function_head->code->id_1->func_param = parameter_list->code;
 
 	cat_op(function, function_head);
 	cat_op(function, parameter_list);
@@ -618,19 +670,40 @@ struct op *param_args_type_casting(struct tac *func_param,
 		param = param->next;  // 移动到 func_param 的末尾
 	}
 
+	// hjj: 需要判断arg的类型是不是TAC_ARG，因为arg可能包含实参的计算表达式
+	while (arg->type != TAC_ARG) {
+		arg = arg->next;
+	}
+
 	while (arg && param->type == TAC_PARAM) {
 		// 检查参数类型是否匹配
-		if (TYPE_CHECK(param->id_1, arg->id_1) == 0) {
+		if (TYPE_CHECK(param->id_1, arg->id_1) == 0 &&
+		    REF_TO_CONTENT(param->id_1->data_type) != arg->id_1->data_type) {
 			// 如果类型不匹配，进行类型转换
 			struct op *cast_exp = type_casting(param->id_1, arg->id_1);
+
 			cat_op(cast_args, cast_exp);  // 将转换后的代码拼接到 cast_args
-			arg->id_1 = cast_exp->addr;   // 更新 args_list 中的参数
+
+			arg->id_1 = cast_exp->addr;  // 更新 args_list 中的参数
+		}
+		// 如果实参是引用类型
+		else if (REF_TO_CONTENT(param->id_1->data_type) ==
+		         arg->id_1->data_type) {
+			struct id *t = new_temp(CONTENT_TO_POINTER(arg->id_1->data_type));
+
+			cat_tac(cast_args, NEW_TAC_1(TAC_VAR, t));
+			cat_tac(cast_args, NEW_TAC_2(TAC_REFER, t, arg->id_1));
+
+			arg->id_1 = t;  // hjj: todo, type checking
 		}
 		arg = arg->next;      // 正向遍历 args_list
 		param = param->prev;  // 反向遍历 func_param
 	}
 	// 实参太多了
-	if (arg) perror("too many args");
+	if (arg) {
+		perror("too many args");
+		printf("arg: %s\n", arg->id_1->name);
+	}
 	// 实参太少了
 	if (param->type == TAC_PARAM) perror("too many params");
 	cat_op(cast_args, args_list);

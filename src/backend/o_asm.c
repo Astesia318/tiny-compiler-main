@@ -186,6 +186,7 @@ void asm_cond(char *op, struct id *a, const char *l) {
 	}
 }
 
+// 形如 a = &b
 void asm_refer(struct id *pointer, struct id *var_pointed) {
 	int pointer_r = reg_find(pointer);
 	if (var_pointed->scope == GLOBAL_TABLE) {
@@ -193,12 +194,23 @@ void asm_refer(struct id *pointer, struct id *var_pointed) {
 	} else {
 		I_TYPE_ARITH("addi", reg_name[pointer_r], "s0", var_pointed->offset);
 	}
+	asm_store_var(pointer, reg_name[pointer_r]);
 }
 
-void asm_derefer(struct id *pointer, struct id *var) {
+// 形如 a = *b
+void asm_derefer_get(struct id *var, struct id *pointer) {
+	int var_r = reg_find(var);
+	int pointer_r = reg_find(pointer);
+	I_TYPE_LOAD("lw", reg_name[var_r], reg_name[pointer_r], 0);
+	asm_store_var(var, reg_name[var_r]);
+}	
+
+// 形如 *a = b
+void asm_derefer_put(struct id *pointer, struct id *var) {
 	int pointer_r = reg_find(pointer);
 	int var_r = reg_find(var);
-	I_TYPE_LOAD("lw", reg_name[var_r], reg_name[pointer_r], 0);
+	S_TYPE_STORE("sw", reg_name[var_r], reg_name[pointer_r], 0);
+	// var 和 pointer 的值都没改变，所以不用 asm_store_var()
 }	
 
 // XXX:需要考虑不同变量的大小，这里默认都是int

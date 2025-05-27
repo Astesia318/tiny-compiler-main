@@ -3,6 +3,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+
 #include "e_config.h"
 
 // 常量定义
@@ -10,7 +11,8 @@
 #define BUF_SIZE 64    // 缓冲区大小
 #define NAME_SIZE 256  // 名称字符串的最大长度
 
-#define NO_ADDR -1  // 无地址标识
+#define NUM_ZERO (struct op *)1145141919  // negative占位
+#define NO_ADDR -1                        // 无地址标识
 
 // 符号表操作方向
 #define INC_HEAD 0  // 增加到表头
@@ -42,21 +44,33 @@
 
 // 数据类型
 #define PTR_OFFSET 10
-#define NO_DATA -1       // 无数据类型
+#define REF_OFFSET 20
+#define NO_DATA -2       // 无数据类型（未定义）
+#define DATA_VOID -1     // 空数据类型 // hjj: todo, 尚未实装检测return
 #define DATA_INT 0       // 整型
 #define DATA_LONG 1      // 长整型
 #define DATA_FLOAT 2     // 浮点型
 #define DATA_DOUBLE 3    // 双精度浮点型
 #define DATA_CHAR 4      // 单字符型
-#define DATA_PINT 10     // 整型
-#define DATA_PLONG 11    // 长整型
-#define DATA_PFLOAT 12   // 浮点型
-#define DATA_PDOUBLE 13  // 双精度浮点型
-#define DATA_PCHAR 14    // 单字符型
+#define DATA_PINT 10     // 整型指针
+#define DATA_PLONG 11    // 长整型指针
+#define DATA_PFLOAT 12   // 浮点型指针
+#define DATA_PDOUBLE 13  // 双精度浮点型指针
+#define DATA_PCHAR 14    // 单字符型指针
+#define DATA_RINT 20     // 整型引用
+#define DATA_RLONG 21    // 长整型引用
+#define DATA_RFLOAT 22   // 浮点型引用
+#define DATA_RDOUBLE 23  // 双精度浮点型引用
+#define DATA_RCHAR 24    // 单字符型引用
 
 #define DATA_IS_POINTER(type) ((type >= DATA_PINT) && (type <= DATA_PCHAR))
+#define DATA_IS_REF(type) ((type >= DATA_RINT) && (type <= DATA_RCHAR))
 #define POINTER_TO_CONTENT(type) (type - PTR_OFFSET)
 #define CONTENT_TO_POINTER(type) (type + PTR_OFFSET)
+#define REF_TO_CONTENT(type) (type - REF_OFFSET)
+#define CONTENT_TO_REF(type) (type + REF_OFFSET)
+#define REF_TO_POINTER(type) (type - REF_OFFSET + PTR_OFFSET)
+#define POINTER_TO_REF(type) (type + REF_OFFSET - PTR_OFFSET)
 
 // 三地址码类型
 #define TAC_UNDEF -1        // 未定义
@@ -86,8 +100,9 @@
 #define TAC_LE 27           // 小于等于
 #define TAC_GT 28           // 大于
 #define TAC_GE 29           // 大于等于
-#define TAC_REFERENCE 30    // 引用
-#define TAC_DEREFERENCE 31  // 解引用
+#define TAC_REFER 30        // 引用
+#define TAC_DEREFER_PUT 31  // 解引用并赋值
+#define TAC_DEREFER_GET 32  // 解引用但不赋值
 
 #define BUF_ALLOC(buf) char buf[BUF_SIZE] = {0};
 
@@ -161,10 +176,12 @@ struct id {
 	int scope;
 	int offset;
 	int label;
-	struct tac *param;  // ID_func的参数列表，为了实现类型转换
 	struct id *next;
+
 	struct op *reference_stat;
 	struct op *dereference_stat;
+
+	struct tac *func_param;  // ID_func的参数列表，为了实现类型转换
 };
 
 // 三地址码

@@ -10,6 +10,8 @@
 
 %%
 
+"void"  {  return VOID;  }
+
 "int"  {  return INT;  }
 
 "long"  {  return LONG;  }

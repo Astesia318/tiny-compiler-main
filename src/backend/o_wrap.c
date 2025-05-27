@@ -78,12 +78,16 @@ void asm_code(struct tac *code) {
 			// 	}
 			// 	return;
 
-		case TAC_REFERENCE:
+		case TAC_REFER:
 			asm_refer(code->id_1, code->id_2);
 			return;
 
-		case TAC_DEREFERENCE:
-			asm_derefer(code->id_1, code->id_2);
+		case TAC_DEREFER_GET:
+			asm_derefer_get(code->id_1, code->id_2);
+			return;
+
+		case TAC_DEREFER_PUT:
+			asm_derefer_put(code->id_1, code->id_2);
 			return;
 
 		case TAC_GOTO:

@@ -6,6 +6,7 @@ test/*.x
 test/*.s
 test/*.o
 *.patch
+.gdb_history
 
 # reference from ysj
 object/

@@ -32,6 +32,7 @@ void yyerror(char* msg);
 %token <num_float> NUM_FLOAT
 %token <num_char> NUM_CHAR
 %token <string> TEXT
+%token <data_type> VOID
 %token <data_type> INT
 %token <data_type> LONG
 %token <data_type> FLOAT
@@ -39,7 +40,9 @@ void yyerror(char* msg);
 %token <data_type> CHAR
 %type <name> left_val
 %type <name> right_val
+%type <data_type> parameter_type
 %type <data_type> complex_type
+%type <data_type> void_type
 %type <data_type> basic_type
 %type <operation> program
 %type <operation> function_declaration_list
@@ -124,13 +127,18 @@ function_head : complex_type IDENTIFIER
                                 $$ = process_function_head($1,$2);
 	                            reset_table(INTO_LOCAL_TABLE); 
                             }
+| void_type IDENTIFIER
+                            {
+                                $$ = process_function_head($1,$2);
+	                            reset_table(INTO_LOCAL_TABLE); 
+                            }
 ;
 
-parameter_list : complex_type IDENTIFIER               
+parameter_list : parameter_type IDENTIFIER               
                             {
                                 $$ = process_parameter_list_head($1,$2);
                             }
-| parameter_list ',' complex_type IDENTIFIER               
+| parameter_list ',' parameter_type IDENTIFIER               
                             {
                                 $$ = process_parameter_list($1,$3,$4);
                             }
@@ -309,7 +317,7 @@ continue_statement : CONTINUE
                                 $$ = process_continue();
                             }
 
-call_statement : IDENTIFIER '(' argument_list ')'
+call_statement : left_val '(' argument_list ')'
                             {
                                 $$ = process_call($1,$3);
                             }
@@ -410,15 +418,14 @@ expression : inc_expression
                             { 
                                 $$ = process_calculate($1,$3,TAC_GE);
                             }	
+| '-' expression  %prec NEGATIVE
+                            {
+                                $$ = process_calculate(NUM_ZERO,$2,TAC_MINUS); // hjj: 统一性起见，不再有单独的negative处理了
+                            }
 | '(' expression ')'				
                             { 
                                 $$ = cpy_op($2);
                             }
-| '-' expression  %prec NEGATIVE
-                            {
-                                $$ = process_negative($2);
-                            }
-
 | call_statement
                             {
                                 $$ = cpy_op($1);
@@ -473,7 +480,7 @@ expression_or_null : expression
 
 left_val : '*' IDENTIFIER
                             {
-                                $$ = (char*)process_dereference($2);
+                                $$ = (char*)process_derefer_put($2);
                             }
 | IDENTIFIER
                             {
@@ -483,7 +490,7 @@ left_val : '*' IDENTIFIER
 
 right_val : '*' IDENTIFIER
                             {
-                                $$ = (char*)process_dereference($2);
+                                $$ = (char*)process_derefer_get($2);
                             }
 | '&' IDENTIFIER
                             {
@@ -495,6 +502,16 @@ right_val : '*' IDENTIFIER
                             }
 ;
 
+parameter_type : basic_type '&'
+                            {
+                                $$ = $1 + REF_OFFSET;
+                            }
+| complex_type
+                            {
+                                $$ = $1;
+                            }
+;
+
 complex_type : basic_type
                             {
                                 $$ = $1;
@@ -502,6 +519,12 @@ complex_type : basic_type
 | basic_type '*'
                             {
                                 $$ = $1 + PTR_OFFSET;
+                            }
+;
+
+void_type : VOID
+                            {
+                                $$ = DATA_VOID;
                             }
 ;
 
@@ -525,6 +548,7 @@ basic_type : INT
                             {
                                 $$ = DATA_CHAR;
                             }
+;
 
 %%
 
