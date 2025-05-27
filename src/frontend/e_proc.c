@@ -131,9 +131,9 @@ struct op *process_rightval(char *name) {
 
 	struct id *var = find_identifier(name);
 	id_exp->addr = var;
-	if (var->val_stat != NULL) {
-		cat_op(id_exp, var->val_stat);
-		var->val_stat = NULL;
+	if (var->reference_stat != NULL) {
+		cat_op(id_exp, var->reference_stat);
+		var->reference_stat = NULL;
 	}
 
 	return id_exp;
@@ -481,20 +481,25 @@ struct op *process_assign(char *name, struct op *exp) {
 	assign_stat->addr = exp_temp;
 
 	cat_op(assign_stat, exp);
-	if (!DATA_IS_POINTER(var->data_type) && var->val_stat != NULL) {
-		printf("handle derefer...\n");
-		cat_op(assign_stat, var->val_stat);
-		source_to_tac(NULL,var->val_stat->code);
-		var->val_stat = NULL;
-		printf("handle derefer done\n");
+	if (var->reference_stat != NULL) {
+		if (DATA_IS_POINTER(var->data_type)) {  // hjj: 类型检查，以后可能要改掉
+			perror("prohibit referencing a pointer");
+			exit(0);
+		}
+		cat_op(assign_stat, var->reference_stat);
+		var->reference_stat = NULL;
 	}
 	if ((TYPE_CHECK(var, exp_temp)) == 0) {
 		struct op *cast_exp = type_casting(var, exp_temp);
 		exp_temp = cast_exp->addr;
 		cat_op(assign_stat, cast_exp);
 	}
-	cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, var, exp_temp));
-	source_to_tac(NULL,assign_stat->code);
+	if (var->dereference_stat != NULL) {
+		var->dereference_stat->code->id_2 = exp_temp;  // 将占位的NULL改掉
+		cat_op(assign_stat, var->dereference_stat);
+	} else {
+		cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, var, exp_temp));
+	}
 
 	return assign_stat;
 }
@@ -502,6 +507,7 @@ struct op *process_assign(char *name, struct op *exp) {
 // 处理被解引用的指针
 const char *process_dereference(char *name) {
 	struct op *pointer_stat = new_op();
+	struct op *content_stat = new_op();
 
 	struct id *var = find_identifier(name);
 	if (!DATA_IS_POINTER(var->data_type)) {
@@ -511,8 +517,11 @@ const char *process_dereference(char *name) {
 
 	struct id *t = new_temp(POINTER_TO_CONTENT(var->data_type));
 	cat_tac(pointer_stat, NEW_TAC_1(TAC_VAR, t));
-	cat_tac(pointer_stat, NEW_TAC_2(TAC_DEREFERENCE, t, var));
-	t->val_stat = pointer_stat;
+	cat_tac(pointer_stat, NEW_TAC_2(TAC_ASSIGN, t, var));
+	cat_tac(content_stat,
+	        NEW_TAC_2(TAC_DEREFERENCE, t, NULL));  // NULL仅起到占位的作用
+	t->reference_stat = pointer_stat;
+	t->dereference_stat = content_stat;
 
 	return t->name;
 }
@@ -530,7 +539,7 @@ const char *process_reference(char *name) {
 	struct id *t = new_temp(CONTENT_TO_POINTER(var->data_type));
 	cat_tac(pointer_stat, NEW_TAC_1(TAC_VAR, t));
 	cat_tac(pointer_stat, NEW_TAC_2(TAC_REFERENCE, t, var));
-	t->val_stat = pointer_stat;
+	t->reference_stat = pointer_stat;
 
 	return t->name;
 }

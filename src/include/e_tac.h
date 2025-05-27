@@ -3,7 +3,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
-#include "config.h"
+#include "e_config.h"
 
 // 常量定义
 #define MAX 100        // 最大值
@@ -141,7 +141,7 @@
 #define PRINT_0(string) printf(string)
 #else
 #define PRINT_3(string, var_1, var_2, var_3) \
-	fprintf(f, string, var_1, var_2, var_2)
+	fprintf(f, string, var_1, var_2, var_3)
 #define PRINT_2(string, var_1, var_2) fprintf(f, string, var_1, var_2)
 #define PRINT_1(string, var_1) fprintf(f, string, var_1)
 #define PRINT_0(string) fprintf(f, string)
@@ -163,7 +163,8 @@ struct id {
 	int label;
 	struct tac *param;  // ID_func的参数列表，为了实现类型转换
 	struct id *next;
-	struct op *val_stat;
+	struct op *reference_stat;
+	struct op *dereference_stat;
 };
 
 // 三地址码

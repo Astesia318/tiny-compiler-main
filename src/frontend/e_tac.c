@@ -285,7 +285,6 @@ const char *data_to_str(int type) {
 }
 
 void output_tac(FILE *f, struct tac *code) {
-	// while (code) {
 	switch (code->type) {
 		case TAC_PLUS:
 			PRINT_3("%s = %s + %s\n", id_to_str(code->id_1),
@@ -342,7 +341,7 @@ void output_tac(FILE *f, struct tac *code) {
 			break;
 
 		case TAC_DEREFERENCE:
-			PRINT_2("%s = *%s\n", id_to_str(code->id_1), id_to_str(code->id_2));
+			PRINT_2("*%s = %s\n", id_to_str(code->id_1), id_to_str(code->id_2));
 			break;
 
 		case TAC_NEGATIVE:
