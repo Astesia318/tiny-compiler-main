@@ -277,6 +277,16 @@ const char *data_to_str(int type) {
 			return "double_ptr";
 		case DATA_PCHAR:
 			return "char_ptr";
+		case DATA_RINT:
+			return "int_ref";
+		case DATA_RLONG:
+			return "long_ref";
+		case DATA_RFLOAT:
+			return "float_ref";
+		case DATA_RDOUBLE:
+			return "double_ref";
+		case DATA_RCHAR:
+			return "char_ref";
 		default:
 			perror("unknown data type");
 			printf("id type: %d\n", type);
@@ -336,12 +346,16 @@ void output_tac(FILE *f, struct tac *code) {
 			        id_to_str(code->id_2), id_to_str(code->id_3));
 			break;
 
-		case TAC_REFERENCE:
+		case TAC_REFER:
 			PRINT_2("%s = &%s\n", id_to_str(code->id_1), id_to_str(code->id_2));
 			break;
 
-		case TAC_DEREFERENCE:
+		case TAC_DEREFER_PUT:
 			PRINT_2("*%s = %s\n", id_to_str(code->id_1), id_to_str(code->id_2));
+			break;
+
+		case TAC_DEREFER_GET:
+			PRINT_2("%s = *%s\n", id_to_str(code->id_1), id_to_str(code->id_2));
 			break;
 
 		case TAC_NEGATIVE:
@@ -363,7 +377,8 @@ void output_tac(FILE *f, struct tac *code) {
 			break;
 
 		case TAC_ARG:
-			PRINT_1("arg %s\n", id_to_str(code->id_1));
+			PRINT_2("arg %s %s\n", data_to_str(code->id_1->data_type),
+			        id_to_str(code->id_1));
 			break;
 
 		case TAC_PARAM:
