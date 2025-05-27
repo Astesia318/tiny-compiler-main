@@ -8,7 +8,7 @@
 #include <time.h>
 
 #include "e_tac.h"
-#include "riscv.h"
+#include "o_riscv.h"
 
 // 生成二元运算对应的汇编代码
 
@@ -195,13 +195,11 @@ void asm_refer(struct id *pointer, struct id *var_pointed) {
 	}
 }
 
-void asm_derefer(struct id *var, struct id *pointer) {
-	printf("derefering\n");
-	int var_r = reg_find(var);
+void asm_derefer(struct id *pointer, struct id *var) {
 	int pointer_r = reg_find(pointer);
-	I_TYPE_LOAD("lw", reg_name[var_r], 0, reg_name[pointer_r]);
-	printf("derefered\n");
-}
+	int var_r = reg_find(var);
+	I_TYPE_LOAD("lw", reg_name[var_r], reg_name[pointer_r], 0);
+}	
 
 // XXX:需要考虑不同变量的大小，这里默认都是int
 void asm_stack_pivot(struct tac *code) {

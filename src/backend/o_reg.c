@@ -8,7 +8,7 @@
 #include <time.h>
 
 #include "e_tac.h"
-#include "riscv.h"
+#include "o_riscv.h"
 
 /* global var */
 struct rdesc rdesc[16];

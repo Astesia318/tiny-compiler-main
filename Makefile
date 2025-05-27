@@ -14,7 +14,8 @@ MAIN_SRC := $(SRCDIR)/tiny_main.c
 FRONT_SRCS := $(FRTDIR)/e_proc.c   \
 		$(FRTDIR)/e_tac.c    
 FRONT_INCS := $(INCDIR)/e_proc.h   \
-		$(INCDIR)/e_tac.h    
+		$(INCDIR)/e_tac.h \
+		$(INCDIR)/e_config.h
 LEX_FRONT_SRC := $(FRTDIR)/e.l
 YACC_FRONT_SRC := $(FRTDIR)/e.y
 
@@ -23,10 +24,10 @@ BACK_SRCS := $(BCKDIR)/o_asm.c \
 		$(BCKDIR)/o_wrap.c 
 BACK_INCS := $(INCDIR)/o_asm.h \
 		$(INCDIR)/o_reg.h \
-		$(INCDIR)/o_wrap.h     
+		$(INCDIR)/o_wrap.h \
+		$(INCDIR)/o_riscv.h
 
 MACHINE_SRCS := $(ASMDIR)/machine.c
-BACK_INCS := $(INCDIR)/riscv.h
 LEX_ASM_SRC := $(ASMDIR)/asm.l
 YACC_ASM_SRC := $(ASMDIR)/asm.y
 
