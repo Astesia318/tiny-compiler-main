@@ -32,7 +32,9 @@ static struct id *_find_identifier(const char *name, struct id **id_table,
 	if (!has_finded && check == CHECK_ID_EXIST && *id_table == id_global) {
 		perror("identifier not found");
 		printf("want name: %s\n", name);
+#ifndef HJJ_DEBUG
 		exit(0);  // lyc
+#endif
 	}
 	return id_wanted;
 }
@@ -56,7 +58,7 @@ static struct id *_collide_identifier(const char *name, int id_type,
 }
 
 static struct id *_add_identifier(const char *name, int id_type, int data_type,
-                                  struct id **id_table) {
+                                  struct id **id_table, int index) {
 	struct id *id_wanted;
 
 	struct id *id_collision = _collide_identifier(name, id_type, data_type);
@@ -79,6 +81,7 @@ static struct id *_add_identifier(const char *name, int id_type, int data_type,
 	id_wanted->name = id_name;
 	id_wanted->id_type = id_type;
 	id_wanted->data_type = data_type;
+	id_wanted->index = index;
 	id_wanted->next = *id_table;
 	*id_table = id_wanted;
 	id_wanted->offset = -1; /* Unset address */
@@ -105,14 +108,15 @@ struct id *find_func(const char *name) {
 	                        CHECK_ID_EXIST);
 }
 
-struct id *add_identifier(const char *name, int id_type, int data_type) {
+struct id *add_identifier(const char *name, int id_type, int data_type,
+                          int index) {
 	// lyc:对于text float double类型常量将其放到全局表里
 	if (ID_IS_GCONST(id_type, data_type))
 		return _add_identifier(name, id_type, data_type,
-		                       _choose_id_table(GLOBAL_TABLE));
+		                       _choose_id_table(GLOBAL_TABLE), index);
 	else
 		return _add_identifier(name, id_type, data_type,
-		                       _choose_id_table(scope));
+		                       _choose_id_table(scope), index);
 }
 
 void init_tac() {
@@ -172,22 +176,8 @@ struct op *cat_list(struct op *exp_1, struct op *exp_2) {
 	return stat_list;
 }
 
-// static struct op *cpy_op(const struct op *src) {
-// 	struct op *nop = new_op();
-// 	cat_tac(nop, src->code);
-// 	if (src->addr != NULL) {
-// 		nop->addr = src->addr;
-// 	}
-// 	return nop;
-// }
-
 // 目前来看，并不需要复制再释放的操作，只需要把指针本身复制给dest
-struct op *cpy_op(struct op *src) {
-	// struct op *nop = cpy_op(src);
-	// free(src);
-	// return nop;
-	return src;
-}
+struct op *cpy_op(struct op *src) { return src; }
 
 struct op *new_op() {
 	struct op *nop;
@@ -212,13 +202,13 @@ struct tac *new_tac(int type, struct id *id_1, struct id *id_2,
 struct id *new_temp(int data_type) {
 	NAME_ALLOC(buf);
 	sprintf(buf, "t%d", temp_amount++);
-	return add_identifier(buf, ID_TEMP, data_type);
+	return add_identifier(buf, ID_TEMP, data_type, NO_INDEX);
 }
 
 struct id *new_label() {
 	NAME_ALLOC(label);
 	sprintf(label, ".L%d", label_amount++);
-	return add_identifier(label, ID_LABEL, NO_DATA);
+	return add_identifier(label, ID_LABEL, NO_DATA, NO_INDEX);
 }
 
 struct block *new_block(struct id *l_begin, struct id *l_end) {
@@ -411,8 +401,13 @@ void output_tac(FILE *f, struct tac *code) {
 			break;
 
 		case TAC_VAR:
-			PRINT_2("var %s %s\n", data_to_str(code->id_1->data_type),
-			        id_to_str(code->id_1));
+			if (code->id_1->index == NO_INDEX) {
+				PRINT_2("var %s %s\n", data_to_str(code->id_1->data_type),
+				        id_to_str(code->id_1));
+			} else {
+				PRINT_3("var %s %s[%d]\n", data_to_str(code->id_1->data_type),
+				        id_to_str(code->id_1), code->id_1->index);
+			}
 			break;
 
 		case TAC_BEGIN:
@@ -427,7 +422,9 @@ void output_tac(FILE *f, struct tac *code) {
 			perror("unknown TAC opcode");
 			break;
 	}
-	// fflush(f);
+#ifdef HJJ_DEBUG
+	fflush(f);
+#endif
 	// code = code->next;
 	// }
 }

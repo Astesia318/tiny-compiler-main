@@ -18,8 +18,8 @@ struct op *process_char(char character);
 struct op *process_identifier(char *name);
 
 struct op *process_declaration(int data_type, struct op *exp_1);
-struct op *process_variable_list_end(char *name);
-struct op *process_variable_list(struct op *exp_1, char *name);
+struct op *process_variable_list_end(char *name, int index);
+struct op *process_variable_list(struct op *exp_1, char *name, int index);
 struct op *process_assign(char *name, struct op *exp_1);
 const char *process_derefer_put(char *name);
 const char *process_derefer_get(char *name);
