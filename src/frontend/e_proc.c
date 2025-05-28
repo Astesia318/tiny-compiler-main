@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "e_tac.h"
+#include "o_reg.h"
 
 struct tac *tac_head;
 static struct tac *arg_list_head;
@@ -95,6 +96,27 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 	return exp;
 }
 
+// 处理数组标识符
+struct op *process_array_identifier(struct op *array_op, int index) {
+	struct op *id_exp = new_op();
+
+	struct id *array = array_op->addr;
+	if (!DATA_IS_POINTER(array->data_type)) {
+		perror("id is not from an array");
+#ifndef HJJ_DEBUG
+		exit(0);
+#endif
+	}
+
+	struct id *t = new_temp(array->data_type);
+	struct op *num_op = process_int(index * TYPE_SIZE(array->data_type));
+	id_exp->addr = t;
+	cat_tac(id_exp, NEW_TAC_1(TAC_VAR, t));
+	cat_tac(id_exp, NEW_TAC_3(TAC_PLUS, t, array, num_op->addr));
+
+	return id_exp;
+}
+
 // 处理标识符
 struct op *process_identifier(char *name) {
 	struct op *id_exp = new_op();
@@ -142,24 +164,6 @@ struct op *process_char(char character) {
 	char_exp->addr = var;
 
 	return char_exp;
-}
-
-// 处理右值
-struct op *process_rightval(char *name) {
-	struct op *id_exp = new_op();
-
-	struct id *var = find_identifier(name);
-	id_exp->addr = var;
-	// if (var->reference_stat != NULL) {
-	// 	cat_op(id_exp, var->reference_stat);
-	// 	var->reference_stat = NULL;
-	// }
-	// if (var->dereference_stat != NULL) {
-	// 	cat_op(id_exp, var->dereference_stat);
-	// 	var->dereference_stat = NULL;
-	// }
-
-	return id_exp;
 }
 
 // 处理形如"a++"和"++a"的表达式

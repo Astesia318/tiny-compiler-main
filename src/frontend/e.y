@@ -82,6 +82,7 @@ void yyerror(char* msg);
 %type <operation> const_val
 %type <operation> left_val
 %type <operation> right_val
+%type <operation> array_identifier
 %type <operation> identifier
 
 %token EQ NE LT LE GT GE
@@ -263,17 +264,19 @@ const_val : NUM_INT { $$ = process_int($1); }
 
 left_val : '*' identifier { $$ = process_derefer_put($2); }
 | '*' expression_without_id { $$ = process_derefer_put($2); }
+| array_identifier { $$ = process_derefer_put($1); }
 | identifier { $$ = cpy_op($1); }
-| identifier INDEX { $$ = cpy_op($1); }
 ;
 
 right_val : '*' identifier { $$ = process_derefer_get($2); }
 | '*' expression_without_id { $$ = process_derefer_get($2); }
 | '&' identifier { $$ = process_reference($2); }
 | '&' expression_without_id { $$ = process_reference($2); }
+| array_identifier { $$ = process_derefer_get($1); }
 | identifier { $$ = cpy_op($1); }
-| identifier INDEX { $$ = cpy_op($1); }
 ;
+
+array_identifier : identifier INDEX { $$ = process_array_identifier($1,$2); }
 
 identifier : IDENTIFIER { $$ = process_identifier($1); }
 
