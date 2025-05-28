@@ -17,9 +17,10 @@ struct op *process_add_identifier(char *name, int index);
 struct op *process_array_identifier(struct op *array_op, int index);
 struct op *process_identifier(char *name);
 
+struct op *process_struct_definition(char *name, struct op *definition_block);
+struct op *process_definition(int data_type, struct op *definition_list);
+struct op *process_add_member(char *name, int index);
 struct op *process_declaration(int data_type, struct op *exp_1);
-struct op *process_variable_list_head(struct op *id_op);
-struct op *process_variable_list(struct op *exp_1, struct op *id_op);
 struct op *process_assign(struct op *leftval, struct op *exp_1);
 struct op *process_derefer_put(struct op *id_op);
 struct op *process_derefer_get(struct op *id_op);
