@@ -115,6 +115,14 @@ extern const char *args_name[];
 		_offset -= ALIGN(data_size);                      \
 	} while (0)
 
+#define LOCAL_ARRAY_OFFSET(identifier, _offset, index)    \
+	do {                                                  \
+		int data_size = TYPE_SIZE(identifier->data_type); \
+		identifier->scope = LOCAL_TABLE;                  \
+		identifier->offset = _offset - index * data_size; \
+		_offset -= ALIGN(index * data_size);              \
+	} while (0)
+
 #define OP_TO_CAL(op, a, b)           \
 	(strcmp(op, "add") == 0   ? a + b \
 	 : strcmp(op, "sub") == 0 ? a - b \

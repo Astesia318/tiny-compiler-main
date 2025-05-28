@@ -117,6 +117,16 @@ struct op *process_array_identifier(struct op *array_op, int index) {
 	return id_exp;
 }
 
+struct op *process_add_identifier(char *name, int index) {
+	struct op *id_op = new_op();
+
+	struct id *var = add_identifier(name, ID_VAR, NO_TYPE, index, NOT_POINTER);
+
+	cat_tac(id_op, NEW_TAC_1(TAC_VAR, var));
+
+	return id_op;
+}
+
 // 处理标识符
 struct op *process_identifier(char *name) {
 	struct op *id_exp = new_op();
@@ -293,26 +303,12 @@ struct op *process_declaration(int data_type, struct op *declaration_exp) {
 	return declaration;
 }
 
-// 处理变量声明的末尾，向符号表加入尚未初始化类型的变量
-struct op *process_variable_list_end(char *name, int index, int is_pointer) {
-	struct op *variable = new_op();
-
-	struct id *var = add_identifier(name, ID_VAR, NO_TYPE, index, is_pointer);
-
-	cat_tac(variable, NEW_TAC_1(TAC_VAR, var));
-
-	return variable;
-}
-
 // 处理变量声明，向符号表加入尚未初始化类型的变量
-struct op *process_variable_list(struct op *var_list_pre, char *name, int index,
-                                 int is_pointer) {
+struct op *process_variable_list(struct op *var_list_pre, struct op *id_op) {
 	struct op *variable_list = new_op();
 
-	struct id *var = add_identifier(name, ID_VAR, NO_TYPE, index, is_pointer);
-
 	cat_op(variable_list, var_list_pre);
-	cat_tac(variable_list, NEW_TAC_1(TAC_VAR, var));
+	cat_op(variable_list, id_op);
 
 	return variable_list;
 }
@@ -642,14 +638,10 @@ struct op *process_program(struct op *program) {
 }
 
 // 处理函数
-struct op *process_function(struct op *function_head, struct op *parameter_list,
-                            struct op *block) {
+struct op *process_function(struct op *function_head, struct op *block) {
 	struct op *function = new_op();
 
-	function_head->code->id_1->func_param = parameter_list->code;
-
 	cat_op(function, function_head);
-	cat_op(function, parameter_list);
 	cat_op(function, block);
 	cat_tac(function, NEW_TAC_0(TAC_END));
 
@@ -657,13 +649,18 @@ struct op *process_function(struct op *function_head, struct op *parameter_list,
 }
 
 // 处理函数头
-struct op *process_function_head(int data_type, char *name) {
+struct op *process_function_head(int data_type, char *name,
+                                 struct op *parameter_list) {
 	struct op *function_head = new_op();
 
 	struct id *func = add_const_identifier(
 	    name, ID_FUNC, data_type);  // 向符号表添加类型为函数的符号
+
 	cat_tac(function_head, NEW_TAC_1(TAC_LABEL, func));
 	cat_tac(function_head, NEW_TAC_0(TAC_BEGIN));
+	cat_op(function_head, parameter_list);
+
+	function_head->code->id_1->func_param = parameter_list->code;
 
 	return function_head;
 }

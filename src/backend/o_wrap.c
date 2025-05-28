@@ -108,20 +108,23 @@ void asm_code(struct tac *code) {
 
 		case TAC_BEGIN:
 			// 栈帧迁移
-			scope = 1;
+			scope = LOCAL_TABLE;
 			asm_stack_pivot(code);
 			asm_param(code);
 			return;
 
 		case TAC_END:
 			// asm_return(NULL);
-			scope = 0;
+			scope = GLOBAL_TABLE;
 			return;
 
 		case TAC_VAR:
-
-			if (scope) {
-				LOCAL_VAR_OFFSET(code->id_1, tof);
+			if (scope == LOCAL_TABLE) {
+				if (code->id_1->index == NO_INDEX) {
+					LOCAL_VAR_OFFSET(code->id_1, tof);
+				} else {
+					LOCAL_ARRAY_OFFSET(code->id_1, tof, code->id_1->index);
+				}
 			} else {
 				asm_gvar(code->id_1);
 			}

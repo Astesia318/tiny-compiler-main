@@ -298,8 +298,13 @@ void asm_gvar(struct id *a) {
 	input_str(obj_file, "	.type	%s,@object\n", a->name);
 	input_str(obj_file, "	.size %s, %d\n", a->name, data_size);
 	input_str(obj_file, "%s:\n", a->name);
-	input_str(obj_file, "	.zero	%d",
-	          data_size);  // XXX:需要实现全局变量赋值后作改动
+	if (a->index == NO_INDEX) {
+		input_str(obj_file, "	.zero	%d",
+		          data_size);  // XXX:需要实现全局变量赋值后作改动
+	} else {
+		input_str(obj_file, "	.zero	%d",
+		          a->index * data_size);  // XXX:需要实现全局变量赋值后作改动
+	}
 }
 // 生成函数返回对应的汇编代码
 void asm_return(struct id *a) {
@@ -325,7 +330,7 @@ void asm_input(struct id *a) {
 		I_TYPE_ARITH("addi", reg_name[R_a1], "s0", a->offset);
 	}
 	struct id *format =
-	    add_identifier(FORMAT_STRING(a->data_type), ID_STRING, NO_DATA);
+	    add_const_identifier(FORMAT_STRING(a->data_type), ID_STRING, NO_DATA);
 	U_TYPE_UPPER_SYM("lla", reg_name[R_a0], format->label);
 	J_TYPE_JUMP_PSEUDO("call", "scanf");
 }
@@ -333,8 +338,8 @@ void asm_input(struct id *a) {
 void asm_output(struct id *a) {
 	if (a->id_type == ID_VAR) {
 		int r = reg_find(a);
-		struct id *format =
-		    add_identifier(FORMAT_STRING(a->data_type), ID_STRING, NO_DATA);
+		struct id *format = add_const_identifier(FORMAT_STRING(a->data_type),
+		                                         ID_STRING, NO_DATA);
 		asm_load_var(a, reg_name[R_a1]);
 		U_TYPE_UPPER_SYM("lla", reg_name[R_a0], format->label);
 
