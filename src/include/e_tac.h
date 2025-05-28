@@ -45,6 +45,7 @@
 #define ID_NUM 3     // 数字常量
 #define ID_LABEL 4   // 标签
 #define ID_STRING 5  // 字符串
+#define ID_STRUCT 6  // 结构体
 
 // 数据类型
 #define PTR_OFFSET 10

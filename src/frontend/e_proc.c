@@ -283,6 +283,24 @@ struct op *process_expression_list(struct op *arg_list_pre,
 /**************************************/
 /************* statement **************/
 /**************************************/
+struct op *process_struct_definition(char *name, struct op *definition_block){
+	struct op *id_op = new_op();
+
+	struct id *var = add_identifier(name, ID_STRUCT, NO_TYPE, NO_INDEX, NOT_POINTER);
+
+	return id_op;
+}
+
+struct op *process_definition(int data_type, struct op *definition_list){
+	
+	return 0;
+}
+
+struct op *process_add_member(char *name, int index){
+	
+	return 0;
+}
+
 // 处理变量声明，为process_variable函数声明的变量加上类型
 struct op *process_declaration(int data_type, struct op *declaration_exp) {
 	struct op *declaration = new_op();
@@ -301,16 +319,6 @@ struct op *process_declaration(int data_type, struct op *declaration_exp) {
 	cat_op(declaration, declaration_exp);
 
 	return declaration;
-}
-
-// 处理变量声明，向符号表加入尚未初始化类型的变量
-struct op *process_variable_list(struct op *var_list_pre, struct op *id_op) {
-	struct op *variable_list = new_op();
-
-	cat_op(variable_list, var_list_pre);
-	cat_op(variable_list, id_op);
-
-	return variable_list;
 }
 
 static void push_block_stack(struct id *label_begin, struct id *label_end) {
