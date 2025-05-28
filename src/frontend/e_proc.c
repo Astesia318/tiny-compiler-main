@@ -18,6 +18,7 @@ static struct block *block_top;
 struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 	struct op *exp = new_op();
 	if (exp_l == NUM_ZERO) exp_l = process_int(0);
+	if (exp_l == NUM_ONE) exp_l = process_int(1);
 
 	struct id *exp_l_addr = exp_l->addr;
 	struct id *exp_r_addr = exp_r->addr;
@@ -72,11 +73,10 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 			struct id *label_1 = new_label();
 			struct id *label_2 = new_label();
 
-			struct id *const_0 =
-			    add_identifier("0", ID_NUM, DATA_INT, NO_INDEX);
+			struct id *const_0 = add_const_identifier("0", ID_NUM, DATA_INT);
 			const_0->num.num_int = 0;
 			struct id *const_1 =
-			    add_identifier("1.0", ID_NUM, DATA_FLOAT, NO_INDEX);
+			    add_const_identifier("1.0", ID_NUM, DATA_FLOAT);
 			const_1->num.num_float = 1.0;
 
 			cat_tac(exp, NEW_TAC_2(TAC_IFZ, t, label_1));
@@ -133,8 +133,8 @@ struct op *process_int(int integer) {
 
 	BUF_ALLOC(buf);  // 声明一个char数组变量buf，储存符号名
 	sprintf(buf, "%d", integer);
-	struct id *var = add_identifier(buf, ID_NUM, DATA_INT,
-	                                NO_INDEX);  // 向符号表添加以buf为名的符号
+	struct id *var = add_const_identifier(
+	    buf, ID_NUM, DATA_INT);  // 向符号表添加以buf为名的符号
 	var->num.num_int = integer;
 	int_exp->addr = var;
 
@@ -147,19 +147,20 @@ struct op *process_float(double floatnum) {
 
 	BUF_ALLOC(buf);
 	sprintf(buf, "%f", floatnum);
-	struct id *var = add_identifier(buf, ID_NUM, DATA_FLOAT, NO_INDEX);
+	struct id *var = add_const_identifier(buf, ID_NUM, DATA_FLOAT);
 	var->num.num_float = floatnum;
 	float_exp->addr = var;
 
 	return float_exp;
 }
 
+// 分配字符型数字符号
 struct op *process_char(char character) {
 	struct op *char_exp = new_op();
 
 	BUF_ALLOC(buf);
 	sprintf(buf, "%c", character);
-	struct id *var = add_identifier(buf, ID_NUM, DATA_CHAR, NO_INDEX);
+	struct id *var = add_const_identifier(buf, ID_NUM, DATA_CHAR);
 	var->num.num_char = character;
 	char_exp->addr = var;
 
@@ -167,48 +168,60 @@ struct op *process_char(char character) {
 }
 
 // 处理形如"a++"和"++a"的表达式
-struct op *process_inc(char *name, int pos) {
+struct op *process_inc(struct op *id_op, int pos) {
 	struct op *inc_exp = new_op();
+	struct op *inc_temp = new_op();
 
-	struct id *var = find_identifier(name);
-	struct id *t = new_temp(var->data_type);
-	struct id *num = add_identifier("1", ID_NUM, NO_DATA, NO_INDEX);
-	inc_exp->addr = t;
+	struct id *var = id_op->addr;
+	inc_temp->addr = var;
 
-	if (var->data_type != DATA_INT) {
+	if (var->data_type == DATA_FLOAT || var->data_type == DATA_DOUBLE) {
 		perror("wrong type");
 	}
-	cat_tac(inc_exp, NEW_TAC_1(TAC_VAR, t));
 	if (pos == INC_HEAD) {
-		cat_tac(inc_exp, NEW_TAC_3(TAC_PLUS, t, var, num));
-		cat_tac(inc_exp, NEW_TAC_2(TAC_ASSIGN, var, t));
+		struct op *inc_done = process_calculate(NUM_ONE, inc_temp, TAC_PLUS);
+		inc_exp->addr = var;
+
+		cat_op(inc_exp, inc_done);
+		cat_tac(inc_exp, NEW_TAC_2(TAC_ASSIGN, var, inc_done->addr));
 	} else {
-		cat_tac(inc_exp, NEW_TAC_2(TAC_ASSIGN, t, var));
-		cat_tac(inc_exp, NEW_TAC_3(TAC_PLUS, var, t, num));
+		struct id *temp_pre = new_temp(var->data_type);
+		struct op *inc_done = process_calculate(NUM_ONE, inc_temp, TAC_PLUS);
+		inc_exp->addr = temp_pre;
+
+		cat_tac(inc_exp, NEW_TAC_2(TAC_ASSIGN, inc_done->addr, var));
+		cat_op(inc_exp, inc_done);
+		cat_tac(inc_exp, NEW_TAC_2(TAC_ASSIGN, var, inc_done->addr));
 	}
 
 	return inc_exp;
 }
 
 // 处理形如"a--"和"--a"的表达式
-struct op *process_dec(char *name, int pos) {
+struct op *process_dec(struct op *id_op, int pos) {
 	struct op *dec_exp = new_op();
+	struct op *dec_temp = new_op();
 
-	struct id *var = find_identifier(name);
-	struct id *t = new_temp(var->data_type);
-	struct id *num = add_identifier("1", ID_NUM, NO_DATA, NO_INDEX);
-	dec_exp->addr = t;
+	struct id *var = id_op->addr;
+	dec_temp->addr = var;
 
-	if (var->data_type != DATA_INT) {
+	if (var->data_type == DATA_FLOAT || var->data_type == DATA_DOUBLE) {
 		perror("wrong type");
 	}
-	cat_tac(dec_exp, NEW_TAC_1(TAC_VAR, t));
 	if (pos == INC_HEAD) {
-		cat_tac(dec_exp, NEW_TAC_3(TAC_MINUS, t, var, num));
-		cat_tac(dec_exp, NEW_TAC_2(TAC_ASSIGN, var, t));
+		struct op *inc_done = process_calculate(NUM_ONE, dec_temp, TAC_MINUS);
+		dec_exp->addr = var;
+
+		cat_op(dec_exp, inc_done);
+		cat_tac(dec_exp, NEW_TAC_2(TAC_ASSIGN, var, inc_done->addr));
 	} else {
-		cat_tac(dec_exp, NEW_TAC_2(TAC_ASSIGN, t, var));
-		cat_tac(dec_exp, NEW_TAC_3(TAC_MINUS, var, t, num));
+		struct id *temp_pre = new_temp(var->data_type);
+		struct op *inc_done = process_calculate(NUM_ONE, dec_temp, TAC_MINUS);
+		dec_exp->addr = temp_pre;
+
+		cat_tac(dec_exp, NEW_TAC_2(TAC_ASSIGN, inc_done->addr, var));
+		cat_op(dec_exp, inc_done);
+		cat_tac(dec_exp, NEW_TAC_2(TAC_ASSIGN, var, inc_done->addr));
 	}
 
 	return dec_exp;
@@ -267,7 +280,8 @@ struct op *process_declaration(int data_type, struct op *declaration_exp) {
 	struct tac *head = declaration_exp->code;
 	while (
 	    head) {  // 逐个修改包含已声明变量的declaration_exp表达式所含变量的类型
-		if (head->id_1->index == NO_INDEX) {
+		if (head->id_1->index == NO_INDEX &&
+		    head->id_1->is_pointer == NOT_POINTER) {
 			head->id_1->data_type = data_type;
 		} else {
 			head->id_1->data_type = CONTENT_TO_POINTER(data_type);
@@ -280,10 +294,10 @@ struct op *process_declaration(int data_type, struct op *declaration_exp) {
 }
 
 // 处理变量声明的末尾，向符号表加入尚未初始化类型的变量
-struct op *process_variable_list_end(char *name, int index) {
+struct op *process_variable_list_end(char *name, int index, int is_pointer) {
 	struct op *variable = new_op();
 
-	struct id *var = add_identifier(name, ID_VAR, NO_TYPE, index);
+	struct id *var = add_identifier(name, ID_VAR, NO_TYPE, index, is_pointer);
 
 	cat_tac(variable, NEW_TAC_1(TAC_VAR, var));
 
@@ -291,11 +305,11 @@ struct op *process_variable_list_end(char *name, int index) {
 }
 
 // 处理变量声明，向符号表加入尚未初始化类型的变量
-struct op *process_variable_list(struct op *var_list_pre, char *name,
-                                 int index) {
+struct op *process_variable_list(struct op *var_list_pre, char *name, int index,
+                                 int is_pointer) {
 	struct op *variable_list = new_op();
 
-	struct id *var = add_identifier(name, ID_VAR, NO_TYPE, index);
+	struct id *var = add_identifier(name, ID_VAR, NO_TYPE, index, is_pointer);
 
 	cat_op(variable_list, var_list_pre);
 	cat_tac(variable_list, NEW_TAC_1(TAC_VAR, var));
@@ -496,7 +510,7 @@ struct op *process_output_variable(char *name) {
 struct op *process_output_text(char *string) {
 	struct op *output_stat = new_op();
 
-	struct id *str = add_identifier(string, ID_STRING, NO_DATA, NO_INDEX);
+	struct id *str = add_const_identifier(string, ID_STRING, NO_DATA);
 
 	cat_tac(output_stat, NEW_TAC_1(TAC_OUTPUT, str));
 
@@ -646,8 +660,8 @@ struct op *process_function(struct op *function_head, struct op *parameter_list,
 struct op *process_function_head(int data_type, char *name) {
 	struct op *function_head = new_op();
 
-	struct id *func = add_identifier(name, ID_FUNC, data_type,
-	                                 NO_INDEX);  // 向符号表添加类型为函数的符号
+	struct id *func = add_const_identifier(
+	    name, ID_FUNC, data_type);  // 向符号表添加类型为函数的符号
 	cat_tac(function_head, NEW_TAC_1(TAC_LABEL, func));
 	cat_tac(function_head, NEW_TAC_0(TAC_BEGIN));
 
@@ -658,8 +672,8 @@ struct op *process_function_head(int data_type, char *name) {
 struct op *process_parameter_list_head(int data_type, char *name) {
 	struct op *parameter = new_op();
 
-	// if(DATA_IS_REF(data_type)) data_type = REF_TO_POINTER(data_type);
-	struct id *var = add_identifier(name, ID_VAR, data_type, NO_INDEX);
+	struct id *var = add_identifier(name, ID_VAR, data_type, NO_INDEX,
+	                                DATA_IS_POINTER(data_type));
 	cat_tac(parameter, NEW_TAC_1(TAC_PARAM, var));
 
 	return parameter;
@@ -670,8 +684,8 @@ struct op *process_parameter_list(struct op *param_list_pre, int data_type,
                                   char *name) {
 	struct op *parameter_list = new_op();
 
-	// if(DATA_IS_REF(data_type)) data_type = REF_TO_POINTER(data_type);
-	struct id *var = add_identifier(name, ID_VAR, data_type, NO_INDEX);
+	struct id *var = add_identifier(name, ID_VAR, data_type, NO_INDEX,
+	                                DATA_IS_POINTER(data_type));
 	cat_op(parameter_list, param_list_pre);
 	cat_tac(parameter_list, NEW_TAC_1(TAC_PARAM, var));
 

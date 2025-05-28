@@ -58,7 +58,8 @@ static struct id *_collide_identifier(const char *name, int id_type,
 }
 
 static struct id *_add_identifier(const char *name, int id_type, int data_type,
-                                  struct id **id_table, int index) {
+                                  struct id **id_table, int index,
+                                  int is_pointer) {
 	struct id *id_wanted;
 
 	struct id *id_collision = _collide_identifier(name, id_type, data_type);
@@ -82,6 +83,7 @@ static struct id *_add_identifier(const char *name, int id_type, int data_type,
 	id_wanted->id_type = id_type;
 	id_wanted->data_type = data_type;
 	id_wanted->index = index;
+	id_wanted->is_pointer = is_pointer;
 	id_wanted->next = *id_table;
 	*id_table = id_wanted;
 	id_wanted->offset = -1; /* Unset address */
@@ -109,14 +111,19 @@ struct id *find_func(const char *name) {
 }
 
 struct id *add_identifier(const char *name, int id_type, int data_type,
-                          int index) {
+                          int index, int is_pointer) {
 	// lyc:对于text float double类型常量将其放到全局表里
 	if (ID_IS_GCONST(id_type, data_type))
 		return _add_identifier(name, id_type, data_type,
-		                       _choose_id_table(GLOBAL_TABLE), index);
+		                       _choose_id_table(GLOBAL_TABLE), index,
+		                       is_pointer);
 	else
 		return _add_identifier(name, id_type, data_type,
-		                       _choose_id_table(scope), index);
+		                       _choose_id_table(scope), index, is_pointer);
+}
+
+struct id *add_const_identifier(const char *name, int id_type, int data_type) {
+	return add_identifier(name, id_type, data_type, NO_INDEX, NOT_POINTER);
 }
 
 void init_tac() {
@@ -202,13 +209,14 @@ struct tac *new_tac(int type, struct id *id_1, struct id *id_2,
 struct id *new_temp(int data_type) {
 	NAME_ALLOC(buf);
 	sprintf(buf, "t%d", temp_amount++);
-	return add_identifier(buf, ID_TEMP, data_type, NO_INDEX);
+	return add_identifier(buf, ID_TEMP, data_type, NO_INDEX,
+	                      DATA_IS_POINTER(data_type));
 }
 
 struct id *new_label() {
 	NAME_ALLOC(label);
 	sprintf(label, ".L%d", label_amount++);
-	return add_identifier(label, ID_LABEL, NO_DATA, NO_INDEX);
+	return add_const_identifier(label, ID_LABEL, NO_DATA);
 }
 
 struct block *new_block(struct id *l_begin, struct id *l_end) {
@@ -405,7 +413,8 @@ void output_tac(FILE *f, struct tac *code) {
 				PRINT_2("var %s %s\n", data_to_str(code->id_1->data_type),
 				        id_to_str(code->id_1));
 			} else {
-				PRINT_3("var %s %s[%d]\n", data_to_str(POINTER_TO_CONTENT(code->id_1->data_type)),
+				PRINT_3("var %s %s[%d]\n",
+				        data_to_str(POINTER_TO_CONTENT(code->id_1->data_type)),
 				        id_to_str(code->id_1), code->id_1->index);
 			}
 			break;

@@ -12,8 +12,11 @@
 #define NAME_SIZE 256  // 名称字符串的最大长度
 
 #define NUM_ZERO (struct op *)1145141919  // negative占位
+#define NUM_ONE (struct op *)114514       // inc&dec占位
 #define NO_ADDR -1                        // 无地址标识
 #define NO_INDEX 0                        // 无地址标识
+#define NOT_POINTER 0                     // 非指针
+#define IS_POINTER 1                      // 非指针
 
 // 符号表操作方向
 #define INC_HEAD 0  // 增加到表头
@@ -190,7 +193,8 @@ struct id {
 
 	struct tac *func_param;  // ID_func的参数列表，为了实现类型转换
 
-	int index; // 数组
+	int index;       // 数组
+	int is_pointer;  // 指针
 };
 
 // 三地址码
@@ -231,7 +235,8 @@ void reset_table(int direction);
 struct id *find_identifier(const char *name);
 struct id *find_func(const char *name);
 struct id *add_identifier(const char *name, int id_type, int data_type,
-                          int index);
+                          int index, int is_pointer);
+struct id *add_const_identifier(const char *name, int id_type, int data_type);
 
 // 三地址码表
 void init_tac();
