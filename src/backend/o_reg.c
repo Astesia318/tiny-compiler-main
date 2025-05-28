@@ -171,7 +171,7 @@ int reg_find(struct id *s) {
 
 void asm_load_var(struct id *s, const char *r) {
 	if (ID_IS_GCONST(s->id_type, s->data_type)) {  // XXX:不知道适不适配string
-		U_TYPE_UPPER_SYM("lla", "a5", s->label);  // 使用 U_TYPE_UPPER_IMM 宏
+		U_TYPE_UPPER_SYM("lla", r, s->label);  // 使用 U_TYPE_UPPER_IMM 宏
 		I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), r, r, 0);
 	} else if (s->id_type == ID_NUM && s->data_type == DATA_INT) {
 		U_TYPE_UPPER_IMM("li", r, s->num);  // 使用 U_TYPE_UPPER_IMM 宏

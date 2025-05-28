@@ -130,6 +130,12 @@ extern const char *args_name[];
 	 : op == TAC_GE ? a <= b \
 	                : -1)
 
+#define FORMAT_STRING(data_type)      \
+	(data_type == DATA_CHAR    ? "%c" \
+	 : data_type == DATA_FLOAT ? "%f" \
+	 : data_type == DATA_INT   ? "%d" \
+	                           : "")
+
 // 函数声明
 void rdesc_clear_all(int r);
 void rdesc_clear_prev(int r);

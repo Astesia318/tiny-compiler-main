@@ -1,10 +1,10 @@
 // int global;
-
-int main()
-{
-    int a, b, c;
-    a = 10;
-    b = 20;
-    c = (a + b * (b <= 12) + a);
-    return 0;
+#include<stdio.h>
+int main() {
+	float a, b, c;
+	scanf("%f",&a);
+	b = 20;
+	c = a + b;
+	printf("%f", c);
+	return 0;
 }

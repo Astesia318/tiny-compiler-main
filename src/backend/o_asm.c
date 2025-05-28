@@ -203,7 +203,7 @@ void asm_derefer_get(struct id *var, struct id *pointer) {
 	int pointer_r = reg_find(pointer);
 	I_TYPE_LOAD("lw", reg_name[var_r], reg_name[pointer_r], 0);
 	asm_store_var(var, reg_name[var_r]);
-}	
+}
 
 // 形如 *a = b
 void asm_derefer_put(struct id *pointer, struct id *var) {
@@ -211,7 +211,7 @@ void asm_derefer_put(struct id *pointer, struct id *var) {
 	int var_r = reg_find(var);
 	S_TYPE_STORE("sw", reg_name[var_r], reg_name[pointer_r], 0);
 	// var 和 pointer 的值都没改变，所以不用 asm_store_var()
-}	
+}
 
 // XXX:需要考虑不同变量的大小，这里默认都是int
 void asm_stack_pivot(struct tac *code) {
@@ -271,7 +271,7 @@ void asm_call(struct tac *code, struct id *a, struct id *b) {
 		cur = cur->next;
 	}
 
-	input_str(obj_file, "	call	%s@plt\n", b->name);
+	J_TYPE_JUMP_PSEUDO("call", b->name);
 	if (a != NULL) {
 		asm_store_var(a, reg_name[R_a0]);
 		rdesc_fill(R_a0, a, MODIFIED);
@@ -316,4 +316,31 @@ void asm_return(struct id *a) {
 	input_str(obj_file, "	lw s0,%d(sp)\n", oon - 8);
 	input_str(obj_file, "	addi sp,sp,%d\n", oon);
 	input_str(obj_file, "	jr ra\n");
+}
+
+void asm_input(struct id *a) {
+	if (a->scope == GLOBAL_TABLE) {
+		U_TYPE_UPPER_SYM("la", reg_name[R_a1], a->name);
+	} else {
+		I_TYPE_ARITH("addi", reg_name[R_a1], "s0", a->offset);
+	}
+	struct id *format =
+	    add_identifier(FORMAT_STRING(a->data_type), ID_STRING, NO_DATA);
+	U_TYPE_UPPER_SYM("lla", reg_name[R_a0], format->label);
+	J_TYPE_JUMP_PSEUDO("call", "scanf");
+}
+
+void asm_output(struct id *a) {
+	if (a->id_type == ID_VAR) {
+		int r = reg_find(a);
+		struct id *format =
+		    add_identifier(FORMAT_STRING(a->data_type), ID_STRING, NO_DATA);
+		asm_load_var(a, reg_name[R_a1]);
+		U_TYPE_UPPER_SYM("lla", reg_name[R_a0], format->label);
+
+	} else if (a->id_type == ID_STRING) {
+		int r = reg_find(a);
+		asm_load_var(a, reg_name[R_a0]);
+	}
+	J_TYPE_JUMP_PSEUDO("call", "printf");
 }

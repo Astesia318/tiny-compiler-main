@@ -24,5 +24,7 @@ void asm_param(struct tac *code);
 void asm_return(struct id *a);
 void asm_label(struct id *a);
 void asm_gvar(struct id *a);
+void asm_output(struct id *a);
+void asm_input(struct id *a);
 
 #endif  // ASM_GENERATOR_H

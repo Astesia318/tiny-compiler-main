@@ -59,24 +59,13 @@ void asm_code(struct tac *code) {
 			asm_store_var(code->id_1, reg_name[r]);
 			return;
 
-			// case TAC_INPUT:
-			// 	r = reg_find(code->id_1);
-			// 	input_str(obj_file, "\tIN\n");
-			// 	input_str(obj_file, "\tLOD R%u,R15\n", r);
-			// 	rdesc[r].mod = MODIFIED;
-			// 	return;
+		case TAC_INPUT:
+			asm_input(code->id_1);
+			return;
 
-			// case TAC_OUTPUT:
-			// 	if (code->id_1->id_type == ID_VAR) {
-			// 		r = reg_find(code->id_1);
-			// 		input_str(obj_file, "\tLOD R15,R%u\n", r);
-			// 		input_str(obj_file, "\tOUTN\n");
-			// 	} else if (code->id_1->id_type == ID_STRING) {
-			// 		r = reg_find(code->id_1);
-			// 		input_str(obj_file, "\tLOD R15,R%u\n", r);
-			// 		input_str(obj_file, "\tOUTS\n");
-			// 	}
-			// 	return;
+		case TAC_OUTPUT:
+			asm_output(code->id_1);
+			return;
 
 		case TAC_REFER:
 			asm_refer(code->id_1, code->id_2);

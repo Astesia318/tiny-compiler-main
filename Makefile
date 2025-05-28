@@ -6,7 +6,7 @@ ASMDIR := $(SRCDIR)/assemble
 INCDIR := $(SRCDIR)/include
 BUILDDIR := build
 TESTDIR := test
-TESTSRC := test
+TESTSRC := my_test
 
 # Sources and generated files
 MAIN_SRC := $(SRCDIR)/tiny_main.c
