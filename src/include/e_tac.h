@@ -73,6 +73,8 @@
 #define REF_TO_POINTER(type) (type - REF_OFFSET + PTR_OFFSET)
 #define POINTER_TO_REF(type) (type + REF_OFFSET - PTR_OFFSET)
 
+#define POINTER_TO_REF(type) (type + REF_OFFSET - PTR_OFFSET)
+
 // 三地址码类型
 #define TAC_UNDEF -1        // 未定义
 #define TAC_END 0           // 结束
@@ -182,8 +184,9 @@ struct id {
 
 	struct id *next;
 
-	struct op *reference_stat;
-	struct op *dereference_stat;
+	// used in pointer deref
+	int temp_derefer_put;
+	// int temp_derefer_get;
 
 	struct tac *func_param;  // ID_func的参数列表，为了实现类型转换
 

@@ -95,18 +95,14 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 	return exp;
 }
 
-// 处理形如"a=-b"的表达式
-struct op *process_negative(struct op *exp) {
-	struct op *neg_exp = new_op();
+// 处理标识符
+struct op *process_identifier(char *name) {
+	struct op *id_exp = new_op();
 
-	struct id *t = new_temp(exp->addr->data_type);
-	struct id *exp_addr = exp->addr;
-	neg_exp->addr = t;
+	struct id *var = find_identifier(name);
+	id_exp->addr = var;
 
-	cat_op(neg_exp, exp);
-	cat_tac(neg_exp, NEW_TAC_2(TAC_NEGATIVE, t, exp_addr));
-
-	return neg_exp;
+	return id_exp;
 }
 
 // 分配整数型数字符号
@@ -154,14 +150,14 @@ struct op *process_rightval(char *name) {
 
 	struct id *var = find_identifier(name);
 	id_exp->addr = var;
-	if (var->reference_stat != NULL) {
-		cat_op(id_exp, var->reference_stat);
-		var->reference_stat = NULL;
-	}
-	if (var->dereference_stat != NULL) {
-		cat_op(id_exp, var->dereference_stat);
-		var->dereference_stat = NULL;
-	}
+	// if (var->reference_stat != NULL) {
+	// 	cat_op(id_exp, var->reference_stat);
+	// 	var->reference_stat = NULL;
+	// }
+	// if (var->dereference_stat != NULL) {
+	// 	cat_op(id_exp, var->dereference_stat);
+	// 	var->dereference_stat = NULL;
+	// }
 
 	return id_exp;
 }
@@ -515,10 +511,10 @@ struct op *process_input(char *name) {
 }
 
 // 处理赋值表达式
-struct op *process_assign(char *name, struct op *exp) {
+struct op *process_assign(struct op *leftval, struct op *exp) {
 	struct op *assign_stat = new_op();
 
-	struct id *var = find_identifier(name);
+	struct id *var = leftval->addr;
 	struct id *exp_temp = exp->addr;
 	struct id *t;  // used in ref
 	assign_stat->addr = exp_temp;
@@ -531,22 +527,10 @@ struct op *process_assign(char *name, struct op *exp) {
 		exp_temp = cast_exp->addr;
 		cat_op(assign_stat, cast_exp);
 	}
-	if (var->dereference_stat != NULL) {
-		if (!DATA_IS_POINTER(
-		        var->data_type)) {  // hjj: 类型检查，以后可能要改掉
-			perror("prohibit dereferencing a nonpointer");
-			printf("var name: %s\n",var->name);
-			printf("var type: %d\n",var->data_type);
-#ifndef HJJ_DEBUG
-			exit(0);
-#endif
-		}
-		cat_tac(var->dereference_stat,
-		        NEW_TAC_2(TAC_DEREFER_PUT, var->dereference_stat->code->id_1,
-		                  exp_temp));
-		cat_op(assign_stat, var->dereference_stat);
-		var->dereference_stat = NULL;
-	} else if (DATA_IS_REF(var->data_type)) {
+	cat_op(assign_stat, leftval);
+	if (DATA_IS_REF(var->data_type)) {
+		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, var, exp_temp));
+	} else if (var->temp_derefer_put) {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, var, exp_temp));
 	} else {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, var, exp_temp));
@@ -556,10 +540,10 @@ struct op *process_assign(char *name, struct op *exp) {
 }
 
 // 处理被解引用并向内赋值的指针
-const char *process_derefer_put(char *name) {
+struct op *process_derefer_put(struct op *id_op) {
 	struct op *content_stat = new_op();
 
-	struct id *var = find_identifier(name);
+	struct id *var = id_op->addr;
 	if (!DATA_IS_POINTER(var->data_type)) {
 		perror("data is not a pointer");
 		printf("data name: %s\n", var->name);
@@ -570,18 +554,21 @@ const char *process_derefer_put(char *name) {
 	}
 
 	struct id *t = new_temp(var->data_type);
+	t->temp_derefer_put = 1;
+	content_stat->addr = t;
+
+	cat_op(content_stat, id_op);
 	cat_tac(content_stat, NEW_TAC_1(TAC_VAR, t));
 	cat_tac(content_stat, NEW_TAC_2(TAC_ASSIGN, t, var));
-	t->dereference_stat = content_stat;
 
-	return t->name;
+	return content_stat;
 }
 
 // 处理被解引用并从内取值的指针
-const char *process_derefer_get(char *name) {
+struct op *process_derefer_get(struct op *id_op) {
 	struct op *content_stat = new_op();
 
-	struct id *var = find_identifier(name);
+	struct id *var = id_op->addr;
 	if (!DATA_IS_POINTER(var->data_type)) {
 		perror("data is not a pointer");
 #ifndef HJJ_DEBUG
@@ -590,18 +577,20 @@ const char *process_derefer_get(char *name) {
 	}
 
 	struct id *t = new_temp(POINTER_TO_CONTENT(var->data_type));
+	content_stat->addr = t;
+
+	cat_op(content_stat, id_op);
 	cat_tac(content_stat, NEW_TAC_1(TAC_VAR, t));
 	cat_tac(content_stat, NEW_TAC_2(TAC_DEREFER_GET, t, var));
-	t->dereference_stat = content_stat;
 
-	return t->name;
+	return content_stat;
 }
 
 // 处理引用的变量
-const char *process_reference(char *name) {
+struct op *process_reference(struct op *id_op) {
 	struct op *pointer_stat = new_op();
 
-	struct id *var = find_identifier(name);
+	struct id *var = id_op->addr;
 	if (DATA_IS_POINTER(var->data_type)) {
 		perror("data is a pointer");
 #ifndef HJJ_DEBUG
@@ -610,11 +599,13 @@ const char *process_reference(char *name) {
 	}
 
 	struct id *t = new_temp(CONTENT_TO_POINTER(var->data_type));
+	pointer_stat->addr = t;
+
+	cat_op(pointer_stat, id_op);
 	cat_tac(pointer_stat, NEW_TAC_1(TAC_VAR, t));
 	cat_tac(pointer_stat, NEW_TAC_2(TAC_REFER, t, var));
-	t->reference_stat = pointer_stat;
 
-	return t->name;
+	return pointer_stat;
 }
 
 /**************************************/
