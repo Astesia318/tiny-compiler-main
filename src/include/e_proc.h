@@ -4,26 +4,25 @@
 struct op *type_casting(struct id *id_remain, struct id *id_casting);
 struct op *param_args_type_casting(struct tac *func_param,
                                    struct op *args_list);
-struct op *process_rightval(char *name);
 struct op *process_argument_list(struct op *exp_1);
 struct op *process_expression_list_head(struct op *exp_1);
 struct op *process_expression_list(struct op *exp_1, struct op *exp_2);
 struct op *process_inc(char *name, int pos);
 struct op *process_dec(char *name, int pos);
 struct op *process_calculate(struct op *exp_1, struct op *exp_2, int cal);
-struct op *process_negative(struct op *exp_1);
 struct op *process_int(int integer);
 struct op *process_float(double floatnum);
 struct op *process_char(char character);
+struct op *process_array_identifier(struct op *array_op, int index);
 struct op *process_identifier(char *name);
 
 struct op *process_declaration(int data_type, struct op *exp_1);
-struct op *process_variable_list_end(char *name);
-struct op *process_variable_list(struct op *exp_1, char *name);
-struct op *process_assign(char *name, struct op *exp_1);
-const char *process_derefer_put(char *name);
-const char *process_derefer_get(char *name);
-const char *process_reference(char *name);
+struct op *process_variable_list_end(char *name, int index);
+struct op *process_variable_list(struct op *exp_1, char *name, int index);
+struct op *process_assign(struct op *leftval, struct op *exp_1);
+struct op *process_derefer_put(struct op *id_op);
+struct op *process_derefer_get(struct op *id_op);
+struct op *process_reference(struct op *id_op);
 struct op *process_input(char *name);
 struct op *process_output_variable(char *name);
 struct op *process_output_text(char *name);

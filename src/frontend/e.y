@@ -43,8 +43,7 @@ void yyerror(char* msg);
 %token <data_type> DOUBLE
 %token <data_type> CHAR
 %token <index> INDEX
-%type <name> left_val
-%type <name> right_val
+%type <index> index_or_null
 %type <data_type> parameter_type
 %type <data_type> complex_type
 %type <data_type> void_type
@@ -76,9 +75,15 @@ void yyerror(char* msg);
 %type <operation> argument_list
 %type <operation> expression_list
 %type <operation> expression
+%type <operation> expression_without_id
 %type <operation> inc_expression
 %type <operation> dec_expression
 %type <operation> expression_or_null
+%type <operation> const_val
+%type <operation> left_val
+%type <operation> right_val
+%type <operation> array_identifier
+%type <operation> identifier
 
 %token EQ NE LT LE GT GE
 %token IF ELSE WHILE FOR BREAK CONTINUE INPUT OUTPUT RETURN
@@ -121,18 +126,15 @@ parameter_list : parameter_type IDENTIFIER { $$ = process_parameter_list_head($1
 /**************** stat ****************/
 /**************************************/
 block: '{' declaration_list statement_list '}' { $$ = cat_list($2,$3); }
-;
 
 declaration_list : { $$ = new_op(); }
 | declaration_list declaration { $$ = cat_list($1,$2); }
 ;
 
 declaration : complex_type variable_list ';' { $$ = process_declaration($1,$2); }
-;
 
-variable_list : IDENTIFIER { $$ = process_variable_list_end($1); }
-| variable_list ',' IDENTIFIER { $$ = process_variable_list($1,$3); }
-| IDENTIFIER INDEX {}
+variable_list : IDENTIFIER index_or_null { $$ = process_variable_list_end($1,$2); }
+| variable_list ',' IDENTIFIER index_or_null { $$ = process_variable_list($1,$3,$4); }
 ;
 
 statement_list : statement { $$ = cpy_op($1); }  
@@ -182,7 +184,7 @@ break_statement : BREAK { $$ = process_break(); }
 
 continue_statement : CONTINUE { $$ = process_continue(); }
 
-call_statement : left_val '(' argument_list ')' { $$ = process_call($1,$3); }
+call_statement : IDENTIFIER '(' argument_list ')' { $$ = process_call($1,$3); }
 
 statement_or_expression_or_null : statement { $$ = cpy_op($1); }
 | expression { $$ = cpy_op($1); }
@@ -219,10 +221,25 @@ expression : inc_expression { $$ = cpy_op($1); }
 | '-' expression  %prec NEGATIVE { $$ = process_calculate(NUM_ZERO,$2,TAC_MINUS); } // hjj: 统一性起见，不再有单独的negative处理了
 | '(' expression ')' { $$ = cpy_op($2); }
 | call_statement { $$ = cpy_op($1); }
-| NUM_INT { $$ = process_int($1); }
-| NUM_FLOAT { $$ = process_float($1); }
-| NUM_CHAR { $$ = process_char($1); }
-| right_val { $$ = process_rightval($1); }
+| const_val { $$ = cpy_op($1); }
+| right_val { $$ = cpy_op($1); }
+;
+
+expression_without_id : inc_expression { $$ = cpy_op($1); }
+| dec_expression { $$ = cpy_op($1); }
+| expression '+' expression	{ $$ = process_calculate($1,$3,TAC_PLUS); }
+| expression '-' expression { $$ = process_calculate($1,$3,TAC_MINUS); }
+| expression '*' expression { $$ = process_calculate($1,$3,TAC_MULTIPLY); }		
+| expression '/' expression	{ $$ = process_calculate($1,$3,TAC_DIVIDE); }		
+| expression EQ expression	{ $$ = process_calculate($1,$3,TAC_EQ); }
+| expression NE expression	{ $$ = process_calculate($1,$3,TAC_NE); }
+| expression LT expression	{ $$ = process_calculate($1,$3,TAC_LT); }
+| expression LE expression	{ $$ = process_calculate($1,$3,TAC_LE); }	
+| expression GT expression	{ $$ = process_calculate($1,$3,TAC_GT); }	
+| expression GE expression	{ $$ = process_calculate($1,$3,TAC_GE); }	
+| '-' expression  %prec NEGATIVE { $$ = process_calculate(NUM_ZERO,$2,TAC_MINUS); } // hjj: 统一性起见，不再有单独的negative处理了
+| '(' expression ')' { $$ = cpy_op($2); }
+| call_statement { $$ = cpy_op($1); }
 ;
 
 inc_expression : INC IDENTIFIER { $$ = process_inc($2,INC_HEAD); }
@@ -237,14 +254,31 @@ expression_or_null : expression { $$ = cpy_op($1); }
 | { $$ = new_op(); }
 ;
 
-left_val : '*' IDENTIFIER { $$ = (char*)process_derefer_put($2); }
-| IDENTIFIER { $$ = $1; }
+index_or_null : INDEX { $$ = $1; }
+| { $$ = NO_INDEX; }
+
+const_val : NUM_INT { $$ = process_int($1); }
+| NUM_FLOAT { $$ = process_float($1); }
+| NUM_CHAR { $$ = process_char($1); }
 ;
 
-right_val : '*' IDENTIFIER { $$ = (char*)process_derefer_get($2); }
-| '&' IDENTIFIER { $$ = (char*)process_reference($2); }
-| IDENTIFIER { $$ = $1; }
+left_val : '*' identifier { $$ = process_derefer_put($2); }
+| '*' expression_without_id { $$ = process_derefer_put($2); }
+| array_identifier { $$ = process_derefer_put($1); }
+| identifier { $$ = cpy_op($1); }
 ;
+
+right_val : '*' identifier { $$ = process_derefer_get($2); }
+| '*' expression_without_id { $$ = process_derefer_get($2); }
+| '&' identifier { $$ = process_reference($2); }
+| '&' expression_without_id { $$ = process_reference($2); }
+| array_identifier { $$ = process_derefer_get($1); }
+| identifier { $$ = cpy_op($1); }
+;
+
+array_identifier : identifier INDEX { $$ = process_array_identifier($1,$2); }
+
+identifier : IDENTIFIER { $$ = process_identifier($1); }
 
 parameter_type : basic_type '&' { $$ = $1 + REF_OFFSET; }
 | complex_type { $$ = $1; }
@@ -255,7 +289,6 @@ complex_type : basic_type { $$ = $1; }
 ;
 
 void_type : VOID { $$ = DATA_VOID; }
-;
 
 basic_type : INT { $$ = DATA_INT; }
 | LONG { $$ = DATA_LONG; }
