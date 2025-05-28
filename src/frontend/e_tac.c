@@ -405,7 +405,7 @@ void output_tac(FILE *f, struct tac *code) {
 				PRINT_2("var %s %s\n", data_to_str(code->id_1->data_type),
 				        id_to_str(code->id_1));
 			} else {
-				PRINT_3("var %s %s[%d]\n", data_to_str(code->id_1->data_type),
+				PRINT_3("var %s %s[%d]\n", data_to_str(POINTER_TO_CONTENT(code->id_1->data_type)),
 				        id_to_str(code->id_1), code->id_1->index);
 			}
 			break;
