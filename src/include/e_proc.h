@@ -13,12 +13,13 @@ struct op *process_calculate(struct op *exp_1, struct op *exp_2, int cal);
 struct op *process_int(int integer);
 struct op *process_float(double floatnum);
 struct op *process_char(char character);
+struct op *process_add_identifier(char *name, int index);
 struct op *process_array_identifier(struct op *array_op, int index);
 struct op *process_identifier(char *name);
 
 struct op *process_declaration(int data_type, struct op *exp_1);
-struct op *process_variable_list_end(char *name, int index,int is_pointer);
-struct op *process_variable_list(struct op *exp_1, char *name, int index,int is_pointer);
+struct op *process_variable_list_head(struct op *id_op);
+struct op *process_variable_list(struct op *exp_1, struct op *id_op);
 struct op *process_assign(struct op *leftval, struct op *exp_1);
 struct op *process_derefer_put(struct op *id_op);
 struct op *process_derefer_get(struct op *id_op);
@@ -39,9 +40,9 @@ struct op *process_if_else(struct op *exp_1, struct op *exp_2,
                            struct op *exp_3);
 
 struct op *process_program(struct op *exp_1);
-struct op *process_function(struct op *exp_1, struct op *exp_2,
-                            struct op *exp_3);
-struct op *process_function_head(int data_type, char *name);
+struct op *process_function(struct op *exp_1, struct op *exp_2);
+struct op *process_function_head(int data_type, char *name,
+                                 struct op *parameter_list);
 struct op *process_parameter_list_head(int data_type, char *name);
 struct op *process_parameter_list(struct op *exp_1, int data_type, char *name);
 #endif
