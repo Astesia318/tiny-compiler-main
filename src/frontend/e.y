@@ -43,6 +43,7 @@ void yyerror(char* msg);
 %token <data_type> DOUBLE
 %token <data_type> CHAR
 %token <index> INDEX
+%type <index> index_or_null
 %type <name> left_val
 %type <name> right_val
 %type <data_type> parameter_type
@@ -121,18 +122,15 @@ parameter_list : parameter_type IDENTIFIER { $$ = process_parameter_list_head($1
 /**************** stat ****************/
 /**************************************/
 block: '{' declaration_list statement_list '}' { $$ = cat_list($2,$3); }
-;
 
 declaration_list : { $$ = new_op(); }
 | declaration_list declaration { $$ = cat_list($1,$2); }
 ;
 
 declaration : complex_type variable_list ';' { $$ = process_declaration($1,$2); }
-;
 
-variable_list : IDENTIFIER { $$ = process_variable_list_end($1); }
-| variable_list ',' IDENTIFIER { $$ = process_variable_list($1,$3); }
-| IDENTIFIER INDEX {}
+variable_list : IDENTIFIER index_or_null { $$ = process_variable_list_end($1,$2); }
+| variable_list ',' IDENTIFIER index_or_null { $$ = process_variable_list($1,$3,$4); }
 ;
 
 statement_list : statement { $$ = cpy_op($1); }  
@@ -237,13 +235,18 @@ expression_or_null : expression { $$ = cpy_op($1); }
 | { $$ = new_op(); }
 ;
 
+index_or_null : INDEX { $$ = $1; }
+| { $$ = NO_INDEX; }
+
 left_val : '*' IDENTIFIER { $$ = (char*)process_derefer_put($2); }
 | IDENTIFIER { $$ = $1; }
+| IDENTIFIER INDEX {}
 ;
 
 right_val : '*' IDENTIFIER { $$ = (char*)process_derefer_get($2); }
 | '&' IDENTIFIER { $$ = (char*)process_reference($2); }
 | IDENTIFIER { $$ = $1; }
+| IDENTIFIER INDEX {}
 ;
 
 parameter_type : basic_type '&' { $$ = $1 + REF_OFFSET; }
@@ -255,7 +258,6 @@ complex_type : basic_type { $$ = $1; }
 ;
 
 void_type : VOID { $$ = DATA_VOID; }
-;
 
 basic_type : INT { $$ = DATA_INT; }
 | LONG { $$ = DATA_LONG; }

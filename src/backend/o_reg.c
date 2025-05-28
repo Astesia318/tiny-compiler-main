@@ -98,7 +98,9 @@ void asm_write_back(int r) {
 	// 	rdesc[r].mod = UNMODIFIED;
 	// }
 	perror("tbd write back");
+#ifndef HJJ_DEBUG
 	exit(0);
+#endif
 }
 
 // 加载符号到寄存器
