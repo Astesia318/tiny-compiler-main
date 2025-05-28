@@ -447,9 +447,13 @@ struct op *process_call(char *name, struct op *arg_list) {
 	struct op *cast_arg_list =
 	    param_args_type_casting(func->func_param, arg_list);
 
-	cat_tac(call_stat, NEW_TAC_1(TAC_VAR, t));
+	if (func->data_type != DATA_VOID) {
+		cat_tac(call_stat, NEW_TAC_1(TAC_VAR, t));
+	}
 	cat_op(call_stat, cast_arg_list);
-	cat_tac(call_stat, NEW_TAC_2(TAC_CALL, t, func));
+	if (func->data_type != DATA_VOID) {
+		cat_tac(call_stat, NEW_TAC_2(TAC_CALL, t, func));
+	}
 
 	return call_stat;
 }
@@ -509,12 +513,6 @@ struct op *process_assign(char *name, struct op *exp) {
 	assign_stat->addr = exp_temp;
 
 	cat_op(assign_stat, exp);
-	if (DATA_IS_REF(var->data_type)) {
-		t = new_temp(REF_TO_POINTER(var->data_type));
-
-		cat_tac(exp, NEW_TAC_1(TAC_VAR, t));
-		cat_tac(exp, NEW_TAC_2(TAC_REFER, t, var));
-	}
 	if ((TYPE_CHECK(var, exp_temp)) == 0 &&
 	    POINTER_TO_CONTENT(var->data_type) != exp_temp->data_type &&
 	    REF_TO_CONTENT(var->data_type) != exp_temp->data_type) {
@@ -534,7 +532,7 @@ struct op *process_assign(char *name, struct op *exp) {
 		cat_op(assign_stat, var->dereference_stat);
 		var->dereference_stat = NULL;
 	} else if (DATA_IS_REF(var->data_type)) {
-		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, t, exp_temp));
+		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, var, exp_temp));
 	} else {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, var, exp_temp));
 	}
@@ -640,6 +638,7 @@ struct op *process_function_head(int data_type, char *name) {
 struct op *process_parameter_list_head(int data_type, char *name) {
 	struct op *parameter = new_op();
 
+	// if(DATA_IS_REF(data_type)) data_type = REF_TO_POINTER(data_type);
 	struct id *var = add_identifier(name, ID_VAR, data_type);
 	cat_tac(parameter, NEW_TAC_1(TAC_PARAM, var));
 
@@ -651,6 +650,7 @@ struct op *process_parameter_list(struct op *param_list_pre, int data_type,
                                   char *name) {
 	struct op *parameter_list = new_op();
 
+	// if(DATA_IS_REF(data_type)) data_type = REF_TO_POINTER(data_type);
 	struct id *var = add_identifier(name, ID_VAR, data_type);
 	cat_op(parameter_list, param_list_pre);
 	cat_tac(parameter_list, NEW_TAC_1(TAC_PARAM, var));
