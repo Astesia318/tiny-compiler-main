@@ -94,7 +94,8 @@ void yyerror(char* msg);
 %type <operation> expression_or_null
 %type <operation> const_val
 %type <operation> add_identifier
-%type <operation> existed_array_identifier
+%type <operation> deref_identifier
+%type <operation> array_identifier
 %type <operation> existed_identifier
 
 %token EQ NE LT LE GT GE
@@ -235,18 +236,16 @@ expression_list : expression_list ',' right_val { $$ = process_expression_list($
 |  right_val { $$ = process_expression_list_head($1); }
 ;
 
-left_val : '*' expression { $$ = process_derefer_put($2); }
-| '*' existed_identifier { $$ = process_derefer_put($2); }
-| existed_array_identifier { $$ = process_derefer_put($1); }
+left_val : deref_identifier { $$ = process_derefer_put($1); }
+| array_identifier { $$ = process_derefer_put($1); }
 | existed_identifier { $$ = cpy_op($1); }
 ;
 
-right_val : expression { $$ = cpy_op($1); }
-| '*' expression { $$ = process_derefer_get($2); }
+right_val : deref_identifier { $$ = process_derefer_get($1); }
 | '&' expression { $$ = process_reference($2); }
-| '*' existed_identifier { $$ = process_derefer_get($2); }
+| expression { $$ = cpy_op($1); }
 | '&' existed_identifier { $$ = process_reference($2); }
-| existed_array_identifier { $$ = process_derefer_get($1); }
+| array_identifier { $$ = process_derefer_get($1); }
 | existed_identifier { $$ = cpy_op($1); }
 | const_val { $$ = cpy_op($1); }
 ;
@@ -288,7 +287,12 @@ const_val : NUM_INT { $$ = process_int($1); }
 // 这么写是因为改成star_or_null的形式会出现神秘的无法解析全局变量的冲突
 add_identifier : IDENTIFIER index_or_null { $$ = process_add_identifier($1,$2) }
 
-existed_array_identifier : existed_identifier index { $$ = process_array_identifier($1,$2); free($2); }
+deref_identifier : '*' deref_identifier { $$ = process_derefer($2); }
+| '*' array_identifier { $$ = process_derefer($2); }
+| '*' existed_identifier { $$ = process_derefer($2); }
+| '*' expression { $$ = process_derefer($2); }
+
+array_identifier : existed_identifier index { $$ = process_array_identifier($1,$2); free($2); }
 
 existed_identifier : IDENTIFIER '.' IDENTIFIER { $$ = process_instance_member($1,$3); }
 | IDENTIFIER PSTRUCT_ACCESS IDENTIFIER { $$ = process_pointer_instance_member($1,$3); }

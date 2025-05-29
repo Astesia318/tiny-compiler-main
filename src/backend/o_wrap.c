@@ -129,7 +129,7 @@ void asm_code(struct tac *code) {
 				if (id_1->array_info != NO_INDEX) {
 					int total_offset =
 					    id_1->array_info
-					        ->array_offset[id_1->array_info->array_level];
+					        ->array_offset[id_1->array_info->max_level];
 					LOCAL_ARRAY_OFFSET(id_1, tof, total_offset);
 				} else {
 					LOCAL_VAR_OFFSET(id_1, tof);

@@ -183,13 +183,13 @@ struct var_type {
 };
 
 struct arr_info {
-	int array_level;
+	int max_level;
 	int array_offset[MAX];
 	int array_index[MAX];
 };
 
 struct ptr_info {
-	int temp_deref_count;
+	// int temp_deref_count;
 	int has_initialized;
 };
 
@@ -260,6 +260,7 @@ struct op {
 	struct tac *code;
 	struct id *addr;
 	struct op *next;  // used in continue and break
+	int deref_count;
 };
 
 // used in continue and break
