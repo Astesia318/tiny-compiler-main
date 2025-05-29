@@ -107,34 +107,56 @@ struct op *process_array_identifier(struct op *array_op,
 	struct op *id_op = new_op();
 
 	struct id *array = array_op->addr;
+	struct arr_info *array_info = array->array_info;
 	if (!array->variable_type->pointer_level) {
 		perror("id is not from an array");
 #ifndef HJJ_DEBUG
 		exit(0);
 #endif
 	}
-	if (array->array_info->array_level < index_info->array_level) {
+
+	if (array_info->max_level < index_info->max_level) {
 		perror("index level too large");
 #ifndef HJJ_DEBUG
 		exit(0);
 #endif
 	}
 
-	struct id *t = new_temp(array->variable_type);
-	cat_tac(id_op, NEW_TAC_1(TAC_VAR, t));
-	cat_tac(id_op, NEW_TAC_2(TAC_ASSIGN, t, array));
+	struct id *t_1 =
+	    new_temp(new_var_type(array->variable_type->data_type,
+	                          array->variable_type->pointer_level, 0));
 	int deref_count = 0;
-	for (int cur_level = 0; cur_level <= index_info->array_level; cur_level++) {
-		t = new_temp(array->variable_type);
+
+	cat_op(id_op, array_op);
+	cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_1));
+	cat_tac(id_op, NEW_TAC_2(TAC_ASSIGN, t_1, array));
+	for (int cur_level = 0; cur_level <= index_info->max_level; cur_level++) {
+		if (array_info->array_index[cur_level] <
+		    index_info->array_index[cur_level] + 1) {
+			perror("index size too large");
+#ifndef HJJ_DEBUG
+			exit(0);
+#endif
+		}
+
+		struct id *t_2 =
+		    new_temp(new_var_type(array->variable_type->data_type,
+		                          array->variable_type->pointer_level, 0));
 		struct op *num_op =
-		    process_int(array->array_info->array_offset[cur_level] *
+		    process_int(index_info->array_index[cur_level] *
+		                array_info->array_offset[array_info->max_level] /
+		                array_info->array_offset[cur_level] *
 		                TYPE_SIZE(array->variable_type));
-		cat_tac(id_op, NEW_TAC_1(TAC_VAR, t));
-		cat_tac(id_op, NEW_TAC_3(TAC_PLUS, t, t, num_op->addr));
+
+		cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_2));
+		cat_tac(id_op, NEW_TAC_3(TAC_PLUS, t_2, t_1, num_op->addr));
+
+		t_1 = t_2;
 		deref_count++;
 	}
-	t->pointer_info.temp_deref_count = deref_count;
-	id_op->addr = t;
+	// t->pointer_info.temp_deref_count = deref_count;
+	id_op->deref_count = deref_count;
+	id_op->addr = t_1;
 
 	return id_op;
 }
@@ -164,25 +186,26 @@ struct op *process_instance_member(char *instance_name, char *member_name) {
 
 	struct id *instance = find_identifier(instance_name);
 	struct member_def *member = find_member(instance, member_name);
-	struct id *t_member =
+	struct id *t_member_ref =
 	    new_temp(new_var_type(member->variable_type->data_type,
 	                          member->variable_type->pointer_level, 1));
-	struct id *t_member_addr =
+	struct id *t_member_ptr =
 	    new_temp(new_var_type(member->variable_type->data_type,
 	                          member->variable_type->pointer_level + 1, 0));
-	struct id *t_instance_addr =
+	struct id *t_instance_ptr =
 	    new_temp(new_var_type(instance->variable_type->data_type,
-	                          member->variable_type->pointer_level + 1, 0));
-	instance_op->addr = t_member;
+	                          instance->variable_type->pointer_level + 1, 0));
+	t_member_ref->array_info = member->array_info;
+	instance_op->addr = t_member_ref;
 
-	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member));
-	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_addr));
-	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_instance_addr));
-	cat_tac(instance_op, NEW_TAC_2(TAC_REFER, t_instance_addr, instance));
-	cat_tac(instance_op, NEW_TAC_3(TAC_PLUS, t_member_addr, t_instance_addr,
+	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ref));
+	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ptr));
+	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_instance_ptr));
+	cat_tac(instance_op, NEW_TAC_2(TAC_REFER, t_instance_ptr, instance));
+	cat_tac(instance_op, NEW_TAC_3(TAC_PLUS, t_member_ptr, t_instance_ptr,
 	                               process_int(member->member_offset)->addr));
 	cat_tac(instance_op,
-	        NEW_TAC_2(TAC_VAR_REFER_INIT, t_member, t_member_addr));
+	        NEW_TAC_2(TAC_VAR_REFER_INIT, t_member_ref, t_member_ptr));
 
 	return instance_op;
 }
@@ -193,20 +216,21 @@ struct op *process_pointer_instance_member(char *instance_ptr_name,
 
 	struct id *instance_ptr = find_identifier(instance_ptr_name);
 	struct member_def *member = find_member(instance_ptr, member_name);
-	struct id *t_member =
+	struct id *t_member_ref =
 	    new_temp(new_var_type(member->variable_type->data_type,
 	                          member->variable_type->pointer_level, 1));
-	struct id *t_member_addr =
+	struct id *t_member_ptr =
 	    new_temp(new_var_type(member->variable_type->data_type,
 	                          member->variable_type->pointer_level + 1, 0));
-	instance_op->addr = t_member;
+	t_member_ref->array_info = member->array_info;
+	instance_op->addr = t_member_ref;
 
-	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member));
-	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_addr));
-	cat_tac(instance_op, NEW_TAC_3(TAC_PLUS, t_member_addr, instance_ptr,
+	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ref));
+	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ptr));
+	cat_tac(instance_op, NEW_TAC_3(TAC_PLUS, t_member_ptr, instance_ptr,
 	                               process_int(member->member_offset)->addr));
 	cat_tac(instance_op,
-	        NEW_TAC_2(TAC_VAR_REFER_INIT, t_member, t_member_addr));
+	        NEW_TAC_2(TAC_VAR_REFER_INIT, t_member_ref, t_member_ptr));
 
 	return instance_op;
 }
@@ -387,11 +411,11 @@ struct member_def *process_definition(struct var_type *variable_type,
                                       struct member_def *definition_list) {
 	struct member_def *cur_definition = definition_list;
 	while (cur_definition) {
+		cur_definition->variable_type = variable_type;
 		if (cur_definition->array_info != NO_INDEX) {
 			cur_definition->variable_type->pointer_level =
-			    cur_definition->array_info->array_level + 1;
+			    cur_definition->array_info->max_level + 1;
 		}
-		cur_definition->variable_type = variable_type;
 		cur_definition->member_offset = cur_member_offset;
 		cur_member_offset += TYPE_SIZE(variable_type);
 
@@ -413,7 +437,7 @@ struct op *process_declaration(struct var_type *variable_type,
 		cur_id->variable_type = variable_type;
 		if (cur_id->array_info != NO_INDEX) {
 			cur_id->variable_type->pointer_level =
-			    cur_id->array_info->array_level + 1;
+			    cur_id->array_info->max_level + 1;
 		}
 
 		cur_declaration = cur_declaration->next;
@@ -646,26 +670,50 @@ struct op *process_assign(struct op *leftval_op, struct op *exp) {
 	if (!TYPE_CHECK(leftval, exp_temp) &&
 	    !REF_TO_CONTENT(leftval->variable_type, exp_temp->variable_type) &&
 	    !CONTENT_TO_REF(leftval->variable_type, exp_temp->variable_type) &&
-	    !(leftval->variable_type->pointer_level -
-	          leftval->pointer_info.temp_deref_count ==
+	    !(leftval->variable_type->pointer_level - leftval_op->deref_count ==
 	      exp_temp->variable_type->pointer_level)) {
 		struct op *cast_exp = type_casting(leftval, exp_temp);
 		exp_temp = cast_exp->addr;
 		cat_op(assign_stat, cast_exp);
 		printf("going to cst!\n");
+		printf("leftval name: %s, type: %d!\n", leftval->name,
+		       leftval->variable_type->data_type);
+		printf("exp_temp name: %s, type: %d!\n", exp_temp->name,
+		       exp_temp->variable_type->data_type);
 	}
 	cat_op(assign_stat, leftval_op);
 	if (leftval->variable_type->is_reference) {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, leftval, exp_temp));
 	} else if (exp_temp->variable_type->is_reference) {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_GET, leftval, exp_temp));
-	} else if (leftval->pointer_info.temp_deref_count) {
-		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, leftval, exp_temp));
+	} else if (leftval_op->deref_count) {
+		struct id *t_1;
+		t_1 = new_temp(leftval->variable_type);
+		cat_tac(assign_stat, NEW_TAC_1(TAC_VAR, t_1));
+		cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, t_1, leftval));
+		while (--leftval_op->deref_count) {
+			struct id *t_2 =
+			    new_temp(new_var_type(t_1->variable_type->data_type,
+			                          t_1->variable_type->pointer_level - 1,
+			                          t_1->variable_type->is_reference));
+			cat_tac(assign_stat, NEW_TAC_1(TAC_VAR, t_2));
+			cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_GET, t_2, t_1));
+			t_1 = t_2;
+		}
+		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, t_1, exp_temp));
 	} else {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, leftval, exp_temp));
 	}
 
 	return assign_stat;
+}
+
+struct op *process_derefer(struct op *id_op) {
+	struct op *content_stat = id_op;
+
+	content_stat->deref_count++;
+
+	return content_stat;
 }
 
 // 处理被解引用并向内赋值的指针
@@ -682,13 +730,14 @@ struct op *process_derefer_put(struct op *id_op) {
 #endif
 	}
 
-	struct id *t = new_temp(var->variable_type);
-	t->pointer_info.temp_deref_count = var->pointer_info.temp_deref_count;
-	content_stat->addr = t;
+	// struct id *t = new_temp(var->variable_type);
+	// t->pointer_info.temp_deref_count = id_op->deref_count;
+	content_stat->addr = var;
+	content_stat->deref_count = id_op->deref_count;
 
 	cat_op(content_stat, id_op);
-	cat_tac(content_stat, NEW_TAC_1(TAC_VAR, t));
-	cat_tac(content_stat, NEW_TAC_2(TAC_ASSIGN, t, var));
+	// cat_tac(content_stat, NEW_TAC_1(TAC_VAR, t));
+	// cat_tac(content_stat, NEW_TAC_2(TAC_ASSIGN, t, var));
 
 	return content_stat;
 }
@@ -705,14 +754,23 @@ struct op *process_derefer_get(struct op *id_op) {
 #endif
 	}
 
-	struct id *t =
+	struct id *t_1 =
 	    new_temp(new_var_type(var->variable_type->data_type,
 	                          var->variable_type->pointer_level - 1, 0));
-	content_stat->addr = t;
 
 	cat_op(content_stat, id_op);
-	cat_tac(content_stat, NEW_TAC_1(TAC_VAR, t));
-	cat_tac(content_stat, NEW_TAC_2(TAC_DEREFER_GET, t, var));
+	cat_tac(content_stat, NEW_TAC_1(TAC_VAR, t_1));
+	cat_tac(content_stat, NEW_TAC_2(TAC_DEREFER_GET, t_1, var));
+	while (--id_op->deref_count) {
+		struct id *t_2 =
+		    new_temp(new_var_type(t_1->variable_type->data_type,
+		                          t_1->variable_type->pointer_level - 1, 0));
+		cat_tac(content_stat, NEW_TAC_1(TAC_VAR, t_2));
+		cat_tac(content_stat, NEW_TAC_2(TAC_DEREFER_GET, t_2, t_1));
+		t_1 = t_2;
+	}
+
+	content_stat->addr = t_1;
 
 	return content_stat;
 }

@@ -302,7 +302,7 @@ void asm_gvar(struct id *a) {
 	input_str(obj_file, "%s:\n", a->name);
 	if (a->array_info != NO_INDEX) {
 		int total_offset =
-		    a->array_info->array_offset[a->array_info->array_level];
+		    a->array_info->array_offset[a->array_info->max_level];
 		input_str(obj_file, "	.zero	%d",
 		          total_offset *
 		              data_size);  // XXX:需要实现全局变量赋值后作改动

@@ -320,18 +320,18 @@ struct var_type *new_const_type(int data_type, int pointer_level) {
 }
 
 struct arr_info *increase_array_level(struct arr_info *array_info, int size) {
-	array_info->array_level += 1;
-	array_info->array_index[array_info->array_level] = size;
-	array_info->array_offset[array_info->array_level] *= size;
+	array_info->max_level += 1;
+	array_info->array_index[array_info->max_level] = size;
+	array_info->array_offset[array_info->max_level] *= size;
 	return array_info;
 }
 
 struct arr_info *new_array_info(int first_level_size) {
 	struct arr_info *new_info;
 	MALLOC_AND_SET_ZERO(new_info, 1, struct arr_info);
-	new_info->array_level = 0;
+	new_info->max_level = 0;
 	new_info->array_index[0] = first_level_size;
-	new_info->array_offset[0] = 1;
+	new_info->array_offset[0] = first_level_size;
 	return new_info;
 }
 
@@ -373,7 +373,7 @@ void output_struct(FILE *f, struct id *id_struct) {
 			                    cur_definition->array_info),
 			        cur_definition->name);
 			for (int cur_level = 0;
-			     cur_level <= cur_definition->array_info->array_level;
+			     cur_level <= cur_definition->array_info->max_level;
 			     cur_level++) {
 				PRINT_1("[%d]",
 				        cur_definition->array_info->array_index[cur_level]);
@@ -490,12 +490,7 @@ void output_tac(FILE *f, struct tac *code) {
 			break;
 
 		case TAC_DEREFER_PUT:
-			int cur_deref = 0;
-			while (cur_deref != id_1->pointer_info.temp_deref_count) {
-				printf("*");
-				cur_deref++;
-			}
-			PRINT_2("%s = %s\n", id_to_str(id_1), id_to_str(id_2));
+			PRINT_2("*%s = %s\n", id_to_str(id_1), id_to_str(id_2));
 			break;
 
 		case TAC_DEREFER_GET:
@@ -563,7 +558,7 @@ void output_tac(FILE *f, struct tac *code) {
 				        data_to_str(id_1->variable_type, id_1->array_info),
 				        id_to_str(id_1));
 				for (int cur_level = 0;
-				     cur_level <= id_1->array_info->array_level; cur_level++) {
+				     cur_level <= id_1->array_info->max_level; cur_level++) {
 					PRINT_1("[%d]", id_1->array_info->array_index[cur_level]);
 				}
 				PRINT_0("\n");

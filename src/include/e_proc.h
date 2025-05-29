@@ -30,6 +30,7 @@ struct member_def *process_definition(struct var_type *variable_type,
 struct op *process_declaration(struct var_type *variable_type,
                                struct op *exp_1);
 struct op *process_assign(struct op *leftval, struct op *exp_1);
+struct op *process_derefer(struct op *id_op);
 struct op *process_derefer_put(struct op *id_op);
 struct op *process_derefer_get(struct op *id_op);
 struct op *process_reference(struct op *id_op);
