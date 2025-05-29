@@ -292,7 +292,7 @@ struct id *new_label() {
 	NAME_ALLOC(label);
 	sprintf(label, ".L%d", label_amount++);
 	return add_const_identifier(label, ID_LABEL,
-	                            new_const_type(DATA_UNDEFINED, NOT_PTR));
+	                            new_const_type(DATA_UNDEFINED, 0));
 }
 
 struct block *new_block(struct id *l_begin, struct id *l_end) {

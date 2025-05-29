@@ -334,7 +334,7 @@ void asm_input(struct id *a) {
 	}
 	struct id *format =
 	    add_const_identifier(FORMAT_STRING(a->variable_type->data_type),
-	                         ID_STRING, new_const_type(DATA_UNDEFINED, NOT_PTR));
+	                         ID_STRING, new_const_type(DATA_UNDEFINED, 0));
 	U_TYPE_UPPER_SYM("lla", reg_name[R_a0], format->label);
 	J_TYPE_JUMP_PSEUDO("call", "scanf");
 }
@@ -344,7 +344,7 @@ void asm_output(struct id *a) {
 		int r = reg_find(a);
 		struct id *format =
 		    add_const_identifier(FORMAT_STRING(a->variable_type->data_type),
-		                         ID_STRING, new_const_type(DATA_UNDEFINED, NOT_PTR));
+		                         ID_STRING, new_const_type(DATA_UNDEFINED, 0));
 		asm_load_var(a, reg_name[R_a1]);
 		U_TYPE_UPPER_SYM("lla", reg_name[R_a0], format->label);
 

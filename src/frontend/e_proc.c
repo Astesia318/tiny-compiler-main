@@ -78,10 +78,10 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 			struct id *label_2 = new_label();
 
 			struct id *const_0 = add_const_identifier(
-			    "0", ID_NUM, new_const_type(DATA_INT, NOT_PTR));
+			    "0", ID_NUM, new_const_type(DATA_INT, 0));
 			const_0->number_info.num.num_int = 0;
 			struct id *const_1 = add_const_identifier(
-			    "1.0", ID_NUM, new_const_type(DATA_FLOAT, NOT_PTR));
+			    "1.0", ID_NUM, new_const_type(DATA_FLOAT, 0));
 			const_1->number_info.num.num_float = 1.0;
 
 			cat_tac(exp, NEW_TAC_2(TAC_IFZ, t, label_1));
@@ -202,7 +202,7 @@ struct op *process_int(int integer) {
 	sprintf(buf, "%d", integer);
 	struct id *var = add_const_identifier(
 	    buf, ID_NUM,
-	    new_const_type(DATA_INT, NOT_PTR));  // 向符号表添加以buf为名的符号
+	    new_const_type(DATA_INT, 0));  // 向符号表添加以buf为名的符号
 	var->number_info.num.num_int = integer;
 	int_op->addr = var;
 
@@ -216,7 +216,7 @@ struct op *process_float(double floatnum) {
 	BUF_ALLOC(buf);
 	sprintf(buf, "%f", floatnum);
 	struct id *var =
-	    add_const_identifier(buf, ID_NUM, new_const_type(DATA_FLOAT, NOT_PTR));
+	    add_const_identifier(buf, ID_NUM, new_const_type(DATA_FLOAT, 0));
 	var->number_info.num.num_float = floatnum;
 	float_op->addr = var;
 
@@ -230,7 +230,7 @@ struct op *process_char(char character) {
 	BUF_ALLOC(buf);
 	sprintf(buf, "%c", character);
 	struct id *var =
-	    add_const_identifier(buf, ID_NUM, new_const_type(DATA_CHAR, NOT_PTR));
+	    add_const_identifier(buf, ID_NUM, new_const_type(DATA_CHAR, 0));
 	var->number_info.num.num_char = character;
 	char_op->addr = var;
 
@@ -593,7 +593,7 @@ struct op *process_output_text(char *string) {
 	struct op *output_stat = new_op();
 
 	struct id *str = add_const_identifier(
-	    string, ID_STRING, new_const_type(DATA_UNDEFINED, NOT_PTR));
+	    string, ID_STRING, new_const_type(DATA_UNDEFINED, 0));
 
 	cat_tac(output_stat, NEW_TAC_1(TAC_OUTPUT, str));
 
@@ -622,7 +622,10 @@ struct op *process_assign(struct op *leftval_op, struct op *exp) {
 	cat_op(assign_stat, exp);
 	if (!TYPE_CHECK(leftval, exp_temp) &&
 	    !REF_TO_CONTENT(leftval->variable_type, exp_temp->variable_type) &&
-	    !CONTENT_TO_REF(leftval->variable_type, exp_temp->variable_type)) {
+	    !CONTENT_TO_REF(leftval->variable_type, exp_temp->variable_type) &&
+	    !(leftval->pointer_info.temp_derefer_put &&
+	      leftval->variable_type->pointer_level - 1 ==
+	          exp_temp->variable_type->pointer_level)) {
 		struct op *cast_exp = type_casting(leftval, exp_temp);
 		exp_temp = cast_exp->addr;
 		cat_op(assign_stat, cast_exp);
@@ -691,17 +694,11 @@ struct op *process_derefer_get(struct op *id_op) {
 	return content_stat;
 }
 
-// 处理引用的变量
+// 处理指针对变量的引用
 struct op *process_reference(struct op *id_op) {
 	struct op *pointer_stat = new_op();
 
 	struct id *var = id_op->addr;
-	// 	if (var->variable_type->pointer_level) {
-	// 		perror("data is a pointer");
-	// #ifndef HJJ_DEBUG
-	// 		exit(0);
-	// #endif
-	// 	}
 
 	struct id *t =
 	    new_temp(new_var_type(var->variable_type->data_type,
