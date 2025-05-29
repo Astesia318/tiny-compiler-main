@@ -16,7 +16,7 @@ OCT_CONST					(0[0-7]*)
 HEX_CONST					((0x|0X)[0-9a-fA-F]+)
 
 FLOAT_CONST					{DEC_FLOAT_CONST}|{HEX_FLOAT_CONST}
-DEC_FLOAT_CONST				((([0-9]*\.[0-9]+)|([0-9]*\.){EXP_PART}?)|([0-9]+{EXP_PART}))
+DEC_FLOAT_CONST				((([0-9]+\.[0-9]+)|([0-9]+\.){EXP_PART}?)|([0-9]+{EXP_PART}))
 EXP_PART					([eE][-+]?[0-9]+)
 HEX_FLOAT_CONST				((0x|0X)(([0-9a-fA-F]*\.[0-9a-fA-F]+)|([0-9a-fA-F]+\.))|([0-9a-fA-F]+){BIN_EXP_PART})
 BIN_EXP_PART				([pP][-+]?[0-9]+)

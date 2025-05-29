@@ -7,10 +7,12 @@
 int scope;
 char temp_buf[256];
 struct id *id_global, *id_local;
-struct id *struct_table;
 static int temp_amount;
 static int label_amount;
 static int lc_amount;
+
+struct id *struct_table;
+int cur_member_offset;
 // lyc:增加受检查id的type，以处理字符常量与变量名之间的误判/不加了
 // check exist时为寻找标识符，not exist时需要判断同名是否同类型
 static struct id *_find_identifier(const char *name, struct id **id_table,
@@ -49,8 +51,8 @@ static struct id **_choose_id_table(int table) {
 }
 
 static struct id *_collide_identifier(const char *name, int id_type,
-                                      int data_type) {
-	if (ID_IS_GCONST(id_type, data_type))
+                                      struct var_type *variable_type) {
+	if (ID_IS_GCONST(id_type, variable_type->data_type))
 		return _find_identifier(name, _choose_id_table(GLOBAL_TABLE),
 		                        CHECK_ID_NOT_EXIST);
 	else
@@ -58,14 +60,16 @@ static struct id *_collide_identifier(const char *name, int id_type,
 		                        CHECK_ID_NOT_EXIST);
 }
 
-static struct id *_add_identifier(const char *name, int id_type, int data_type,
+static struct id *_add_identifier(const char *name, int id_type,
+                                  struct var_type *variable_type,
                                   struct id **id_table, int index) {
 	struct id *id_wanted;
 
-	struct id *id_collision = _collide_identifier(name, id_type, data_type);
+	struct id *id_collision = _collide_identifier(name, id_type, variable_type);
 	if (id_collision) {  // 表内有同名id
-		if (ID_IS_GCONST(id_collision->id_type,
-		                 data_type)) {  // 表中已有同名常量id，返回
+		if (ID_IS_GCONST(
+		        id_collision->id_type,
+		        variable_type->data_type)) {  // 表中已有同名常量id，返回
 			return id_collision;
 		} else if (id_type != ID_NUM) {
 			// 表中同名不是常量id，错误
@@ -81,12 +85,12 @@ static struct id *_add_identifier(const char *name, int id_type, int data_type,
 	strcpy(id_name, name);
 	id_wanted->name = id_name;
 	id_wanted->id_type = id_type;
-	id_wanted->data_type = data_type;
+	id_wanted->variable_type = variable_type;
 	id_wanted->pointer_info.index = index;
 	id_wanted->next = *id_table;
 	*id_table = id_wanted;
 	id_wanted->offset = -1; /* Unset address */
-	if (ID_IS_GCONST(id_type, data_type)) {
+	if (ID_IS_GCONST(id_type, variable_type->data_type)) {
 		id_wanted->label = lc_amount++;
 	}
 
@@ -127,7 +131,7 @@ struct id *check_struct_type(int struct_type) {
 struct id *check_struct_name(char *name) {
 	struct id *cur_struct = struct_table;
 	while (cur_struct) {
-		if (!strcmp(cur_struct->name,name)) {
+		if (!strcmp(cur_struct->name, name)) {
 			return cur_struct;
 		}
 		cur_struct = cur_struct->next;
@@ -139,29 +143,46 @@ struct id *check_struct_name(char *name) {
 	return NULL;
 }
 
-struct id *add_identifier(const char *name, int id_type, int data_type,
-                          int index) {
+struct member_def *find_member(struct id *instance, char *member_name) {
+	struct id *struct_def =
+	    check_struct_type(instance->variable_type->data_type);
+	struct member_def *cur_member_def = struct_def->struct_info.definition_list;
+	while (cur_member_def) {
+		if (!strcmp(cur_member_def->name, member_name)) {
+			return cur_member_def;
+		}
+		cur_member_def = cur_member_def->next_def;
+	}
+	perror("no member found");
+#ifndef HJJ_DEBUG
+	exit(0);
+#endif
+	return NULL;
+}
+
+struct id *add_identifier(const char *name, int id_type,
+                          struct var_type *variable_type, int index) {
 	// lyc:对于text float double类型常量将其放到全局表里
-	if (ID_IS_GCONST(id_type, data_type))
-		return _add_identifier(name, id_type, data_type,
+	if (ID_IS_GCONST(id_type, variable_type->data_type))
+		return _add_identifier(name, id_type, variable_type,
 		                       _choose_id_table(GLOBAL_TABLE), index);
 	else
-		return _add_identifier(name, id_type, data_type,
+		return _add_identifier(name, id_type, variable_type,
 		                       _choose_id_table(scope), index);
 }
 
-struct id *add_const_identifier(const char *name, int id_type, int data_type) {
-	return add_identifier(name, id_type, data_type, NO_INDEX);
+struct id *add_const_identifier(const char *name, int id_type,
+                                struct var_type *variable_type) {
+	return add_identifier(name, id_type, variable_type, NO_INDEX);
 }
 
-struct member_def *add_member_def(char *name, int data_type, int index) {
+struct member_def *add_member_def_raw(char *name, int index) {
 	struct member_def *new_def;
 
 	MALLOC_AND_SET_ZERO(new_def, 1, struct member_def);
 	char *member_name = (char *)malloc(sizeof(char) * strlen(name));
 	strcpy(member_name, name);
 	new_def->name = member_name;
-	new_def->data_type = data_type;
 	new_def->pointer_info.index = index;
 
 	return new_def;
@@ -174,6 +195,7 @@ void init_tac() {
 	temp_amount = 1;
 	lc_amount = 0;
 	label_amount = 1;
+	cur_member_offset = 0;
 }
 
 void reset_table(int direction) {
@@ -257,17 +279,18 @@ struct tac *new_tac(int type, struct id *id_1, struct id *id_2,
 	return ntac;
 }
 
-struct id *new_temp(int data_type) {
+struct id *new_temp(struct var_type *variable_type) {
 	NAME_ALLOC(buf);
 	sprintf(buf, "t%d", temp_amount++);  // hjj: todo, check collision
 	// return add_identifier(buf, ID_TEMP, data_type, NO_INDEX,
-	return add_identifier(buf, ID_VAR, data_type, NO_INDEX);
+	return add_identifier(buf, ID_VAR, variable_type, NO_INDEX);
 }
 
 struct id *new_label() {
 	NAME_ALLOC(label);
 	sprintf(label, ".L%d", label_amount++);
-	return add_const_identifier(label, ID_LABEL, NO_DATA);
+	return add_const_identifier(label, ID_LABEL,
+	                            new_var_type(DATA_UNDEFINED, NOT_PTR));
 }
 
 struct block *new_block(struct id *l_begin, struct id *l_end) {
@@ -278,20 +301,27 @@ struct block *new_block(struct id *l_begin, struct id *l_end) {
 	return nstack;
 }
 
+struct var_type *new_var_type(int data_type, int pointer_type) {
+	struct var_type *new_type;
+	MALLOC_AND_SET_ZERO(new_type, 1, struct var_type);
+	new_type->data_type = data_type;
+	new_type->pointer_type = pointer_type;
+	return new_type;
+}
+
 const char *id_to_str(struct id *id) {
 	if (id == NULL) return "NULL";
 
 	switch (id->id_type) {
 		case ID_NUM:
 			// XXX:怎么释放
-			if (id->data_type == DATA_CHAR) {
+			if (id->variable_type->data_type == DATA_CHAR) {
 				char *buf = (char *)malloc(16);  // 动态分配内存
 				sprintf(buf, "\'%s\'", id->name);
 				return buf;  // 返回动态分配的字符串
 			}
 		case ID_VAR:
 		case ID_FUNC:
-		// case ID_TEMP:
 		case ID_LABEL:
 		case ID_STRING:
 			return id->name;
@@ -307,60 +337,57 @@ void output_struct(FILE *f, struct id *id_struct) {
 	struct member_def *cur_definition = id_struct->struct_info.definition_list;
 	while (cur_definition) {
 		if (cur_definition->pointer_info.index == NO_INDEX) {
-			PRINT_2("member %s %s\n", data_to_str(cur_definition->data_type),
+			PRINT_2("member %s %s\n",
+			        data_to_str(cur_definition->variable_type),
 			        cur_definition->name);
 		} else {
 			PRINT_3("member %s %s[%d]\n",
-			        data_to_str(POINTER_TO_CONTENT(cur_definition->data_type)),
+			        data_to_str(cur_definition->variable_type),
 			        cur_definition->name, cur_definition->pointer_info.index);
 		}
 		cur_definition = cur_definition->next_def;
 	}
 }
 
-const char *data_to_str(int data_type) {
-	if (data_type == NO_TYPE) return "NULL";
+const char *data_to_str(struct var_type *variable_type) {
+	int data_type = variable_type->data_type;
+	int pointer_type = variable_type->pointer_type;
+	char *buf = (char *)malloc(NAME_SIZE);
 
-	if (data_type >= DATA_STRUCT_INIT) {
-		return check_struct_type(data_type)->name;
+	if (data_type == DATA_UNDEFINED) {
+		sprintf(buf, "NULL");
+	} else if (data_type >= DATA_STRUCT_INIT) {
+		sprintf(buf, "%s", check_struct_type(data_type)->name);
+	} else {
+		switch (data_type) {
+			case DATA_INT:
+				sprintf(buf, "%s", "int");
+				break;
+			case DATA_LONG:
+				sprintf(buf, "%s", "long");
+				break;
+			case DATA_FLOAT:
+				sprintf(buf, "%s", "float");
+				break;
+			case DATA_DOUBLE:
+				sprintf(buf, "%s", "double");
+				break;
+			case DATA_CHAR:
+				sprintf(buf, "%s", "char");
+				break;
+			default:
+				perror("unknown data type");
+				printf("id type: %d\n", data_type);
+				sprintf(buf, "%s", "?");
+				break;
+		}
 	}
-
-	switch (data_type) {
-		case DATA_INT:
-			return "int";
-		case DATA_LONG:
-			return "long";
-		case DATA_FLOAT:
-			return "float";
-		case DATA_DOUBLE:
-			return "double";
-		case DATA_CHAR:
-			return "char";
-		case DATA_PINT:
-			return "int_ptr";
-		case DATA_PLONG:
-			return "long_ptr";
-		case DATA_PFLOAT:
-			return "float_ptr";
-		case DATA_PDOUBLE:
-			return "double_ptr";
-		case DATA_PCHAR:
-			return "char_ptr";
-		case DATA_RINT:
-			return "int_ref";
-		case DATA_RLONG:
-			return "long_ref";
-		case DATA_RFLOAT:
-			return "float_ref";
-		case DATA_RDOUBLE:
-			return "double_ref";
-		case DATA_RCHAR:
-			return "char_ref";
-		default:
-			perror("unknown data type");
-			printf("id type: %d\n", data_type);
-			return "?";
+	if (pointer_type == PTR_VAR) {
+		strcat(buf, " *");
+	} else if (pointer_type == REF_VAR) {
+		strcat(buf, " &");
 	}
+	return buf;
 }
 
 void output_tac(FILE *f, struct tac *code) {
@@ -427,9 +454,8 @@ void output_tac(FILE *f, struct tac *code) {
 			PRINT_2("%s = *%s\n", id_to_str(code->id_1), id_to_str(code->id_2));
 			break;
 
-		case TAC_NEGATIVE:
-			PRINT_2("%s = - %s\n", id_to_str(code->id_1),
-			        id_to_str(code->id_2));
+		case TAC_VAR_REFER_INIT:
+			PRINT_2("ref init %s = %s\n", id_to_str(code->id_1), id_to_str(code->id_2));
 			break;
 
 		case TAC_ASSIGN:
@@ -446,12 +472,12 @@ void output_tac(FILE *f, struct tac *code) {
 			break;
 
 		case TAC_ARG:
-			PRINT_2("arg %s %s\n", data_to_str(code->id_1->data_type),
+			PRINT_2("arg %s %s\n", data_to_str(code->id_1->variable_type),
 			        id_to_str(code->id_1));
 			break;
 
 		case TAC_PARAM:
-			PRINT_2("param %s %s\n", data_to_str(code->id_1->data_type),
+			PRINT_2("param %s %s\n", data_to_str(code->id_1->variable_type),
 			        id_to_str(code->id_1));
 			break;
 
@@ -481,11 +507,11 @@ void output_tac(FILE *f, struct tac *code) {
 
 		case TAC_VAR:
 			if (code->id_1->pointer_info.index == NO_INDEX) {
-				PRINT_2("var %s %s\n", data_to_str(code->id_1->data_type),
+				PRINT_2("var %s %s\n", data_to_str(code->id_1->variable_type),
 				        id_to_str(code->id_1));
 			} else {
 				PRINT_3("var %s %s[%d]\n",
-				        data_to_str(POINTER_TO_CONTENT(code->id_1->data_type)),
+				        data_to_str(code->id_1->variable_type),
 				        id_to_str(code->id_1), code->id_1->pointer_info.index);
 			}
 			break;
@@ -514,6 +540,7 @@ void source_to_tac(FILE *f, struct tac *code) {
 	while (cur_struct) {
 		output_struct(f, cur_struct);
 		cur_struct = cur_struct->struct_info.next_struct;
+		PRINT_0("\n");
 	}
 	while (code) {
 		output_tac(f, code);

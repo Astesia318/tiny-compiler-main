@@ -15,8 +15,6 @@
 #define NUM_ONE (struct op *)114514       // inc&dec占位
 #define NO_ADDR -1                        // 无地址标识
 #define NO_INDEX 0                        // 无地址标识
-#define NOT_POINTER 0                     // 非指针
-#define IS_POINTER 1                      // 非指针
 
 // 符号表操作方向
 #define INC_HEAD 0  // 增加到表头
@@ -39,53 +37,54 @@
 #define IS_ASSIGN 1
 
 // 符号类型
-#define NO_TYPE -1  // 无类型
-#define ID_VAR 0    // 变量
-#define ID_FUNC 1   // 函数
-// #define ID_TEMP 2    // 临时变量
-#define ID_NUM 3     // 数字常量
-#define ID_LABEL 4   // 标签
-#define ID_STRING 5  // 字符串
-#define ID_STRUCT 6  // 结构体
+#define ID_NO_TYPE -1  		// 无类型
+#define ID_UNDEFINED 0		// 未定义类型
+#define ID_VAR 1       	    // 变量
+#define ID_FUNC 2     	    // 函数
+#define ID_NUM 3     		// 数字常量
+#define ID_LABEL 4   		// 标签
+#define ID_STRING 5  		// 字符串
+#define ID_STRUCT 6  		// 结构体
 
 // 变量类型
-#define NOT_VAR 0
-#define BASIC_VAR 1
+#define NO_TYPE (void *)0	// 无类型
+#define UNDEFINED_PTR 0
+#define NOT_PTR 1
 #define PTR_VAR 2
 #define REF_VAR 3
 
 // 数据类型
 #define PTR_OFFSET 10
 #define REF_OFFSET 20
-#define NO_DATA -2       // 无数据类型（未定义）
-#define DATA_VOID -1     // 空数据类型 // hjj: todo, 尚未实装检测return
-#define DATA_INT 0       // 整型
-#define DATA_LONG 1      // 长整型
-#define DATA_FLOAT 2     // 浮点型
-#define DATA_DOUBLE 3    // 双精度浮点型
-#define DATA_CHAR 4      // 单字符型
-#define DATA_PINT 10     // 整型指针
-#define DATA_PLONG 11    // 长整型指针
-#define DATA_PFLOAT 12   // 浮点型指针
-#define DATA_PDOUBLE 13  // 双精度浮点型指针
-#define DATA_PCHAR 14    // 单字符型指针
-#define DATA_RINT 20     // 整型引用
-#define DATA_RLONG 21    // 长整型引用
-#define DATA_RFLOAT 22   // 浮点型引用
-#define DATA_RDOUBLE 23  // 双精度浮点型引用
-#define DATA_RCHAR 24    // 单字符型引用
+#define DATA_VOID -1     	// 空数据类型 // hjj: todo, 尚未实装检测return
+#define DATA_UNDEFINED 0 	// 无数据类型（未定义）
+#define DATA_INT 1       	// 整型
+#define DATA_LONG 2      	// 长整型
+#define DATA_FLOAT 3     	// 浮点型
+#define DATA_DOUBLE 4    	// 双精度浮点型
+#define DATA_CHAR 5      	// 单字符型
 #define DATA_STRUCT_INIT 100
 
-#define DATA_IS_POINTER(type) ((type >= DATA_PINT) && (type <= DATA_PCHAR))
-#define DATA_IS_REF(type) ((type >= DATA_RINT) && (type <= DATA_RCHAR))
-#define POINTER_TO_CONTENT(type) (type - PTR_OFFSET)
-#define CONTENT_TO_POINTER(type) (type + PTR_OFFSET)
-#define REF_TO_CONTENT(type) (type - REF_OFFSET)
-#define CONTENT_TO_REF(type) (type + REF_OFFSET)
-#define REF_TO_POINTER(type) (type - REF_OFFSET + PTR_OFFSET)
-#define POINTER_TO_REF(type) (type + REF_OFFSET - PTR_OFFSET)
-
-#define POINTER_TO_REF(type) (type + REF_OFFSET - PTR_OFFSET)
+// #define DATA_IS_POINTER(type) ((type >= DATA_PINT) && (type <= DATA_PCHAR))
+// #define DATA_IS_REF(type) ((type >= DATA_RINT) && (type <= DATA_RCHAR))
+#define POINTER_TO_CONTENT(type_1, type_2)         \
+	((type_1)->data_type == (type_2)->data_type && \
+	 (type_1)->pointer_type == PTR_VAR && (type_2)->pointer_type == NOT_PTR)
+#define CONTENT_TO_POINTER(type_1, type_2)         \
+	((type_1)->data_type == (type_2)->data_type && \
+	 (type_1)->pointer_type == NOT_PTR && (type_2)->pointer_type == PTR_VAR)
+#define REF_TO_CONTENT(type_1, type_2)             \
+	((type_1)->data_type == (type_2)->data_type && \
+	 (type_1)->pointer_type == REF_VAR && (type_2)->pointer_type == NOT_PTR)
+#define CONTENT_TO_REF(type_1, type_2)             \
+	((type_1)->data_type == (type_2)->data_type && \
+	 (type_1)->pointer_type == NOT_PTR && (type_2)->pointer_type == REF_VAR)
+#define REF_TO_POINTER(type_1, type_2)             \
+	((type_1)->data_type == (type_2)->data_type && \
+	 (type_1)->pointer_type == REF_VAR && (type_2)->pointer_type == NOT_PTR)
+#define POINTER_TO_REF(type_1, type_2)             \
+	((type_1)->data_type == (type_2)->data_type && \
+	 (type_1)->pointer_type == PTR_VAR && (type_2)->pointer_type == REF_VAR)
 
 // 三地址码类型
 #define TAC_UNDEF -1        // 未定义
@@ -118,6 +117,7 @@
 #define TAC_REFER 30        // 引用
 #define TAC_DEREFER_PUT 31  // 解引用并赋值
 #define TAC_DEREFER_GET 32  // 解引用但不赋值
+#define TAC_VAR_REFER_INIT 33	// 初始化引用变量
 
 #define BUF_ALLOC(buf) char buf[BUF_SIZE] = {0};
 
@@ -139,7 +139,7 @@
 	MALLOC_AND_SET_ZERO(identifier, 1, struct id);        \
 	identifier->name = func_name;                         \
 	identifier->id_type = ID_FUNC;                        \
-	identifier->data_type = type;                         \
+	identifier->variable_type->data_type = type;          \
 	identifier->offset = -1;
 
 #define TAC_IS_CMP(cal) (cal >= TAC_EQ && cal <= TAC_GE)
@@ -159,10 +159,12 @@
 	 : cal == TAC_GT       ? "__gtsf2"  \
 	 : cal == TAC_GE       ? "__gesf2"  \
 	                       : "")
-#define TYPE_CHECK(id1, id2)                                            \
-	((id1->data_type == id2->data_type) ||                              \
-	 ((id1->data_type == DATA_CHAR) && (id2->data_type == DATA_INT)) || \
-	 ((id1->data_type == DATA_INT) && (id2->data_type == DATA_CHAR)))
+#define TYPE_CHECK(id1, id2)                                             \
+	((id1->variable_type->data_type == id2->variable_type->data_type) || \
+	 ((id1->variable_type->data_type == DATA_CHAR) &&                    \
+	  (id2->variable_type->data_type == DATA_INT)) ||                    \
+	 ((id1->variable_type->data_type == DATA_INT) &&                     \
+	  (id2->variable_type->data_type == DATA_CHAR)))
 
 #ifdef HJJ_DEBUG
 #define PRINT_3(string, var_1, var_2, var_3) printf(string, var_1, var_2, var_3)
@@ -178,9 +180,15 @@
 #endif
 
 // 符号
+struct var_type {
+	int pointer_type;
+	int data_type;
+};
+
 struct ptr_info {
 	int index;
 	int temp_derefer_put;
+	int has_initialized;
 };
 
 struct func_info {
@@ -198,7 +206,9 @@ struct num_info {
 
 struct member_def {
 	const char *name;
-	int data_type;
+	int member_offset;
+
+	struct var_type *variable_type;
 
 	struct ptr_info pointer_info;
 
@@ -208,6 +218,7 @@ struct member_def {
 struct strc_info {
 	struct member_def *definition_list;
 	int struct_type;
+	int struct_offset;
 
 	struct id *next_struct;
 };
@@ -216,8 +227,7 @@ struct id {
 	const char *name;
 
 	int id_type;
-	int var_type;
-	int data_type;
+	struct var_type *variable_type;
 
 	int scope;
 	int offset;
@@ -262,7 +272,9 @@ extern struct tac *tac_head;
 extern struct tac *tac_tail;
 extern FILE *source_file, *tac_file, *obj_file;
 extern struct id *id_global, *id_local;
+
 extern struct id *struct_table;
+extern int cur_member_offset;
 
 // 符号表
 void reset_table(int direction);
@@ -270,11 +282,13 @@ void reset_table(int direction);
 struct id *find_identifier(const char *name);
 struct id *check_struct_type(int struct_type);
 struct id *check_struct_name(char *name);
+struct member_def *find_member(struct id *instance, char *member_name);
 struct id *find_func(const char *name);
-struct member_def *add_member_def(char *name, int data_type, int index);
-struct id *add_identifier(const char *name, int id_type, int data_type,
-                          int index);
-struct id *add_const_identifier(const char *name, int id_type, int data_type);
+struct member_def *add_member_def_raw(char *name, int index);
+struct id *add_identifier(const char *name, int id_type,
+                          struct var_type *variable_type, int index);
+struct id *add_const_identifier(const char *name, int id_type,
+                                struct var_type *variable_type);
 
 // 三地址码表
 void init_tac();
@@ -289,13 +303,14 @@ struct member_def *cat_def(struct member_def *list_1,
 struct op *new_op();
 struct tac *new_tac(int type, struct id *id_1, struct id *id_2,
                     struct id *id_3);
-struct id *new_temp(int data_type);
+struct id *new_temp(struct var_type *variable_type);
 struct id *new_label();
 struct block *new_block(struct id *label_begin, struct id *label_end);
+struct var_type *new_var_type(int data_type, int pointer_type);
 
 // 字符串处理
 const char *id_to_str(struct id *id);
-const char *data_to_str(int type);
+const char *data_to_str(struct var_type *variable_type);
 void output_tac(FILE *f, struct tac *code);
 void output_struct(FILE *f, struct id *id_struct);
 void source_to_tac(FILE *f, struct tac *code);

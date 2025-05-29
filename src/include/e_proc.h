@@ -16,12 +16,15 @@ struct op *process_char(char character);
 struct op *process_add_identifier(char *name, int index);
 struct op *process_array_identifier(struct op *array_op, int index);
 struct op *process_identifier(char *name);
-int process_struct_type(char *name);
+struct op *process_instance_member(char *instance_name, char *member_name);
+struct var_type *process_struct_type(char *name, int pointer_type);
 
-struct op *process_struct_definition(char *name, struct member_def *definition_block);
-struct member_def *process_definition(int data_type, struct member_def *member_list);
-struct member_def *process_add_member(char *name, int index);
-struct op *process_declaration(int data_type, struct op *exp_1);
+struct op *process_struct_definition(char *name,
+                                     struct member_def *definition_block);
+struct member_def *process_definition(struct var_type *variable_type,
+                                      struct member_def *member_list);
+struct op *process_declaration(struct var_type *variable_type,
+                               struct op *exp_1);
 struct op *process_assign(struct op *leftval, struct op *exp_1);
 struct op *process_derefer_put(struct op *id_op);
 struct op *process_derefer_get(struct op *id_op);
@@ -43,8 +46,10 @@ struct op *process_if_else(struct op *exp_1, struct op *exp_2,
 
 struct op *process_program(struct op *exp_1);
 struct op *process_function(struct op *exp_1, struct op *exp_2);
-struct op *process_function_head(int data_type, char *name,
+struct op *process_function_head(struct var_type *variable_type, char *name,
                                  struct op *parameter_list);
-struct op *process_parameter_list_head(int data_type, char *name);
-struct op *process_parameter_list(struct op *exp_1, int data_type, char *name);
+struct op *process_parameter_list_head(struct var_type *variable_type,
+                                       char *name);
+struct op *process_parameter_list(struct op *exp_1,
+                                  struct var_type *variable_type, char *name);
 #endif

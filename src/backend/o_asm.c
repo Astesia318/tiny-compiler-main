@@ -16,9 +16,9 @@ void asm_bin(char *op, struct id *a, struct id *b, struct id *c) {
 	// bc都是立即数,直接计算
 	int reg_a = reg_alloc(a);
 	if (b->id_type == ID_NUM && c->id_type == ID_NUM) {
-		U_TYPE_UPPER_IMM(
-		    "li", reg_name[reg_a],
-		    OP_TO_CAL(op, b->number_info.num.num_int, c->number_info.num.num_int));  // li rd, imm
+		U_TYPE_UPPER_IMM("li", reg_name[reg_a],
+		                 OP_TO_CAL(op, b->number_info.num.num_int,
+		                           c->number_info.num.num_int));  // li rd, imm
 	}
 	// bc其中一个不是立即数
 	else {
@@ -56,9 +56,10 @@ void asm_bin(char *op, struct id *a, struct id *b, struct id *c) {
 		else {
 			I_TYPE_ARITH("addi", reg_name[reg_a],
 			             reg_b != -1 ? reg_name[reg_b] : reg_name[reg_c],
-			             reg_b != -1 ? (op[0] == 's' ? -(c->number_info.num.num_int)
-			                                         : c->number_info.num.num_int)
-			                         : b->number_info.num.num_int);
+			             reg_b != -1
+			                 ? (op[0] == 's' ? -(c->number_info.num.num_int)
+			                                 : c->number_info.num.num_int)
+			                 : b->number_info.num.num_int);
 		}
 	}
 	// store a
@@ -116,7 +117,8 @@ void asm_cmp(int op, struct id *a, struct id *b, struct id *c) {
 					break;
 			}
 		} else {
-			int imm_c = reg_b == -1 ? b->number_info.num.num_int : c->number_info.num.num_int;
+			int imm_c = reg_b == -1 ? b->number_info.num.num_int
+			                        : c->number_info.num.num_int;
 			int reg_temp = reg_b == -1 ? reg_c : reg_b;
 			const char *temp_n = reg_name[reg_temp];
 
@@ -221,9 +223,9 @@ void asm_stack_pivot(struct tac *code) {
 	struct tac *cur;
 	for (cur = code; cur != NULL; cur = cur->next) {
 		if (cur->type == TAC_VAR) {
-			var_size += ALIGN(TYPE_SIZE(cur->id_1->data_type));
+			var_size += ALIGN(TYPE_SIZE(cur->id_1->variable_type));
 		} else if (cur->type == TAC_PARAM) {
-			param_size += ALIGN(TYPE_SIZE(cur->id_1->data_type));
+			param_size += ALIGN(TYPE_SIZE(cur->id_1->variable_type));
 		} else if (cur->type == TAC_END) {
 			break;
 		}
@@ -290,11 +292,11 @@ void asm_label(struct id *a) {
 }
 
 void asm_gvar(struct id *a) {
-	int data_size = TYPE_SIZE(a->data_type);
+	int data_size = TYPE_SIZE(a->variable_type);
 	a->scope = 0; /* global var */
 	input_str(obj_file, "	.globl	%s\n", a->name);
 	input_str(obj_file, "	.bss\n");
-	input_str(obj_file, "	.align	%d\n", TYPE_ALIGN(a->data_type));
+	input_str(obj_file, "	.align	%d\n", TYPE_ALIGN(a->variable_type));
 	input_str(obj_file, "	.type	%s,@object\n", a->name);
 	input_str(obj_file, "	.size %s, %d\n", a->name, data_size);
 	input_str(obj_file, "%s:\n", a->name);
@@ -303,7 +305,8 @@ void asm_gvar(struct id *a) {
 		          data_size);  // XXX:需要实现全局变量赋值后作改动
 	} else {
 		input_str(obj_file, "	.zero	%d",
-		          a->pointer_info.index * data_size);  // XXX:需要实现全局变量赋值后作改动
+		          a->pointer_info.index *
+		              data_size);  // XXX:需要实现全局变量赋值后作改动
 	}
 }
 // 生成函数返回对应的汇编代码
@@ -330,7 +333,8 @@ void asm_input(struct id *a) {
 		I_TYPE_ARITH("addi", reg_name[R_a1], "s0", a->offset);
 	}
 	struct id *format =
-	    add_const_identifier(FORMAT_STRING(a->data_type), ID_STRING, NO_DATA);
+	    add_const_identifier(FORMAT_STRING(a->variable_type->data_type),
+	                         ID_STRING, new_var_type(DATA_UNDEFINED, NOT_PTR));
 	U_TYPE_UPPER_SYM("lla", reg_name[R_a0], format->label);
 	J_TYPE_JUMP_PSEUDO("call", "scanf");
 }
@@ -338,8 +342,9 @@ void asm_input(struct id *a) {
 void asm_output(struct id *a) {
 	if (a->id_type == ID_VAR) {
 		int r = reg_find(a);
-		struct id *format = add_const_identifier(FORMAT_STRING(a->data_type),
-		                                         ID_STRING, NO_DATA);
+		struct id *format =
+		    add_const_identifier(FORMAT_STRING(a->variable_type->data_type),
+		                         ID_STRING, new_var_type(DATA_UNDEFINED, NOT_PTR));
 		asm_load_var(a, reg_name[R_a1]);
 		U_TYPE_UPPER_SYM("lla", reg_name[R_a0], format->label);
 

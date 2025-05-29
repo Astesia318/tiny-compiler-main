@@ -29,7 +29,9 @@ void yyerror(char* msg);
     double num_float;
     char num_char;
 
+    // int data_type;
     int data_type;
+    struct var_type *variable_type;
 
     int index;
 }
@@ -47,11 +49,9 @@ void yyerror(char* msg);
 %token <data_type> CHAR
 %token <index> INDEX
 %type <index> index_or_null
-%type <data_type> parameter_type
-%type <data_type> complex_type
-%type <data_type> void_type
-%type <data_type> struct_type
-%type <data_type> basic_type
+%type <variable_type> parameter_type
+%type <variable_type> void_type
+%type <variable_type> basic_type
 %type <operation> program
 %type <operation> function_declaration_list
 %type <operation> function_declaration
@@ -124,7 +124,7 @@ function : function_head statement_block { reset_table(OUT_LOCAL_TABLE); $$ = pr
 | error {}
 ;
 
-function_head : complex_type IDENTIFIER '(' parameter_list ')' { $$ = process_function_head($1,$2,$4); reset_table(INTO_LOCAL_TABLE); }
+function_head : basic_type IDENTIFIER '(' parameter_list ')' { $$ = process_function_head($1,$2,$4); reset_table(INTO_LOCAL_TABLE); }
 | void_type IDENTIFIER '(' parameter_list ')' { $$ = process_function_head($1,$2,$4); reset_table(INTO_LOCAL_TABLE); }
 ;
 
@@ -144,13 +144,13 @@ definition_list : definition { $$ = $1; }
 | definition_list definition { $$ = cat_def($1,$2); }
 ;
 
-definition : complex_type member_list ';' { $$ = process_definition($1,$2); }
+definition : basic_type member_list ';' { $$ = process_definition($1,$2); }
 
 member_list : add_member { $$ = $1; }
 | member_list ',' add_member { $$ = cat_def($1,$3); }
 ;
 
-add_member : IDENTIFIER index_or_null { $$ = process_add_member($1,$2); }
+add_member : IDENTIFIER index_or_null { $$ = add_member_def_raw($1,$2); }
 
 statement_block: '{' declaration_list statement_list '}' { $$ = cat_list($2,$3); }
 
@@ -158,7 +158,7 @@ declaration_list : { $$ = new_op(); }
 | declaration_list declaration { $$ = cat_list($1,$2); }
 ;
 
-declaration : complex_type variable_list ';' { $$ = process_declaration($1,$2); }
+declaration : basic_type variable_list ';' { $$ = process_declaration($1,$2); }
 
 variable_list : add_identifier { $$ = cpy_op($1); }
 | variable_list ',' add_identifier { $$ = cat_list($1,$3); }
@@ -284,33 +284,32 @@ const_val : NUM_INT { $$ = process_int($1); }
 ;
 
 // 这么写是因为改成star_or_null的形式会出现神秘的无法解析全局变量的冲突
-add_identifier : IDENTIFIER index_or_null { $$ = process_add_identifier($1,$2); }
+add_identifier : IDENTIFIER index_or_null { $$ = process_add_identifier($1,$2) }
 
 array_identifier : existed_identifier INDEX { $$ = process_array_identifier($1,$2); }
 
-existed_identifier : IDENTIFIER { $$ = process_identifier($1); }
+existed_identifier : IDENTIFIER '.' IDENTIFIER { $$ = process_instance_member($1,$3); }
+| IDENTIFIER { $$ = process_identifier($1); }
+;
 
-parameter_type : basic_type '&' { $$ = $1 + REF_OFFSET; }
+parameter_type : basic_type '&' { $$ = new_var_type($1->data_type,REF_VAR); }
 | basic_type { $$ = $1; }
 ;
 
-void_type : VOID { $$ = DATA_VOID; }
+void_type : VOID { $$ = new_var_type(DATA_VOID,NOT_PTR); }
 
-complex_type : struct_type { $$ = $1 }
-| basic_type { $$ = $1; }
-
-struct_type : STRUCT IDENTIFIER { $$ = process_struct_type($2); }
-
-basic_type : INT { $$ = DATA_INT; }
-| LONG { $$ = DATA_LONG; }
-| FLOAT { $$ = DATA_FLOAT; }
-| DOUBLE { $$ = DATA_DOUBLE; }
-| CHAR { $$ = DATA_CHAR; }
-| INT '*' { $$ = DATA_PINT; }
-| LONG '*' { $$ = DATA_PLONG; }
-| FLOAT '*' { $$ = DATA_PFLOAT; }
-| DOUBLE '*' { $$ = DATA_PDOUBLE; }
-| CHAR '*' { $$ = DATA_PCHAR; }
+basic_type : INT { $$ = new_var_type(DATA_INT,NOT_PTR); }
+| LONG { $$ = new_var_type(DATA_LONG,NOT_PTR); }
+| FLOAT { $$ = new_var_type(DATA_FLOAT,NOT_PTR); }
+| DOUBLE { $$ = new_var_type(DATA_DOUBLE,NOT_PTR); }
+| CHAR { $$ = new_var_type(DATA_CHAR,NOT_PTR); }
+| INT '*' { $$ = new_var_type(DATA_INT,PTR_VAR); }
+| LONG '*' { $$ = new_var_type(DATA_LONG,PTR_VAR); }
+| FLOAT '*' { $$ = new_var_type(DATA_FLOAT,PTR_VAR); }
+| DOUBLE '*' { $$ = new_var_type(DATA_DOUBLE,PTR_VAR); }
+| CHAR '*' { $$ = new_var_type(DATA_CHAR,PTR_VAR); }
+| STRUCT IDENTIFIER { $$ = process_struct_type($2,NOT_PTR); }
+| STRUCT IDENTIFIER '*' { $$ = process_struct_type($2,PTR_VAR); }
 ;
 
 index_or_null : INDEX { $$ = $1; }

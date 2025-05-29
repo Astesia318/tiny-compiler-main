@@ -51,8 +51,10 @@ void asm_code(struct tac *code) {
 			return;
 
 		case TAC_ASSIGN:
+		case TAC_VAR_REFER_INIT:
 			r = reg_find(code->id_2);
-			if (code->id_1->data_type == code->id_2->data_type)
+			if (code->id_1->variable_type->data_type ==
+			    code->id_2->variable_type->data_type)
 				rdesc_fill(
 				    r, code->id_1,
 				    MODIFIED);  // 只有类型相同时覆盖寄存器描述符，防止未截断错误
@@ -120,10 +122,11 @@ void asm_code(struct tac *code) {
 
 		case TAC_VAR:
 			if (scope == LOCAL_TABLE) {
-				if (code->id_1->pointer_info.index == NO_INDEX) {
-					LOCAL_VAR_OFFSET(code->id_1, tof);
+				if (code->id_1->pointer_info.index != NO_INDEX) {
+					LOCAL_ARRAY_OFFSET(code->id_1, tof,
+					                   code->id_1->pointer_info.index);
 				} else {
-					LOCAL_ARRAY_OFFSET(code->id_1, tof, code->id_1->pointer_info.index);
+					LOCAL_VAR_OFFSET(code->id_1, tof);
 				}
 			} else {
 				asm_gvar(code->id_1);
@@ -162,7 +165,7 @@ void tac_to_obj() {
 		asm_code(cur);
 	}
 	for (struct id *gconst = id_global; gconst != NULL; gconst = gconst->next) {
-		if (ID_IS_GCONST(gconst->id_type, gconst->data_type)) {
+		if (ID_IS_GCONST(gconst->id_type, gconst->variable_type->data_type)) {
 			asm_lc(gconst);
 		}
 	}
@@ -191,7 +194,7 @@ void asm_lc(struct id *s) {
 	const char *t = s->name; /* The text */
 	int i;
 	input_str(obj_file, "\t.section	.rodata\n");
-	input_str(obj_file, "\t.align	%d\n", TYPE_ALIGN(s->data_type));
+	input_str(obj_file, "\t.align	%d\n", TYPE_ALIGN(s->variable_type));
 	input_str(obj_file, ".LC%u:\n", s->label); /* Label for the string */
 	if (s->id_type == ID_STRING) {
 		input_str(obj_file, "\t.string	\"%s\"\n", s->name);
@@ -199,10 +202,11 @@ void asm_lc(struct id *s) {
 #if DEBUG_PRINT == 1
 		input_str(obj_file, "\t\t\t\t\t\t\t#	%s\n", t);
 #endif
-		for (int i = TYPE_SIZE(DATA_DOUBLE) - TYPE_SIZE(s->data_type);
-		     i < TYPE_SIZE(DATA_DOUBLE); i += TYPE_SIZE(DATA_FLOAT)) {
+		for (int i = DATA_SIZE(DATA_DOUBLE) - TYPE_SIZE(s->variable_type);
+		     i < DATA_SIZE(DATA_DOUBLE); i += DATA_SIZE(DATA_FLOAT)) {
 			int temp;
-			memcpy(&temp, (void *)(&s->number_info.num) + 0, TYPE_SIZE(DATA_FLOAT));
+			memcpy(&temp, (void *)(&s->number_info.num) + 0,
+			       DATA_SIZE(DATA_FLOAT));
 			input_str(obj_file, "\t.word	%d\n", temp);
 		}
 	}

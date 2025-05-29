@@ -71,30 +71,36 @@ extern const char *args_name[];
 #define HWORD 2
 #define BYTE 1
 
-#define TYPE_SIZE(data_type)                                                 \
-	((data_type) == DATA_INT        ? 4                                      \
-	 : (data_type) == DATA_LONG     ? 4                                      \
-	 : (data_type) == DATA_FLOAT    ? 4                                      \
-	 : (data_type) == DATA_CHAR     ? 1                                      \
-	 : (data_type) == DATA_DOUBLE   ? 8                                      \
-	 : (DATA_IS_POINTER(data_type)) ? 4                                      \
-	 : (DATA_IS_REF(data_type))                                              \
-	     ? 4                                                                 \
-	     : -1 /* 或者返回一个错误码，比如 -1, 或者 ((void)0) 引发编译错误 */ \
-	)
-// XXX:这里认为no_data是string
-#define TYPE_ALIGN(data_type)                                                \
-	((data_type) == NO_DATA         ? 2                                      \
-	 : (data_type) == DATA_INT      ? 2                                      \
-	 : (data_type) == DATA_LONG     ? 2                                      \
-	 : (data_type) == DATA_FLOAT    ? 2                                      \
-	 : (data_type) == DATA_CHAR     ? 1                                      \
-	 : (data_type) == DATA_DOUBLE   ? 3                                      \
-	 : (DATA_IS_POINTER(data_type)) ? 2                                      \
-	 : (DATA_IS_REF(data_type))                                              \
-	     ? 2                                                                 \
-	     : -1 /* 或者返回一个错误码，比如 -1, 或者 ((void)0) 引发编译错误 */ \
-	)
+#define DATA_SIZE(data_type)         \
+	((data_type) == DATA_INT     ? 4 \
+	 : (data_type) == DATA_LONG  ? 4 \
+	 : (data_type) == DATA_FLOAT ? 4 \
+	 : (data_type) == DATA_CHAR  ? 1 \
+	 : (data_type) == DATA_DOUBLE    \
+	     ? 8                         \
+	     : -1) /* 或者返回一个错误码，比如 -1, 或者 ((void)0) 引发编译错误 */
+               // XXX:这里认为DATA_UNDEFINED是string
+               // hjj:DATA_UNDEFINED改成了DATA_UNDEFINED
+
+#define TYPE_SIZE(variable_type)                       \
+	((variable_type)->pointer_type == PTR_VAR   ? 4    \
+	 : (variable_type)->pointer_type == REF_VAR ? 4    \
+	 : (variable_type)->data_type >= DATA_STRUCT_INIT  \
+	     ? check_struct_type(variable_type->data_type) \
+	           ->struct_info.struct_offset             \
+	     : DATA_SIZE((variable_type)->data_type))
+
+#define TYPE_ALIGN(variable_type)                       \
+	((variable_type)->pointer_type == PTR_VAR       ? 2 \
+	 : (variable_type)->pointer_type == REF_VAR     ? 2 \
+	 : (variable_type)->data_type == DATA_UNDEFINED ? 2 \
+	 : (variable_type)->data_type == DATA_INT       ? 2 \
+	 : (variable_type)->data_type == DATA_LONG      ? 2 \
+	 : (variable_type)->data_type == DATA_FLOAT     ? 2 \
+	 : (variable_type)->data_type == DATA_CHAR      ? 1 \
+	 : (variable_type)->data_type == DATA_DOUBLE        \
+	     ? 3                                            \
+	     : -1) /* 或者返回一个错误码，比如 -1, 或者 ((void)0) 引发编译错误 */
 #define max(a, b) (a > b ? a : b)
 #define ALIGN(data_size) (max(DATA_ALIGN, data_size))
 #define STORE_OP(data_size)        \
@@ -107,20 +113,20 @@ extern const char *args_name[];
 	 : (data_size) == HWORD ? "lhu" \
 	 : (data_size) == BYTE  ? "lbu" \
 	                        : "")
-#define LOCAL_VAR_OFFSET(identifier, _offset)             \
-	do {                                                  \
-		int data_size = TYPE_SIZE(identifier->data_type); \
-		identifier->scope = LOCAL_TABLE;                  \
-		identifier->offset = _offset - data_size;         \
-		_offset -= ALIGN(data_size);                      \
+#define LOCAL_VAR_OFFSET(identifier, _offset)                 \
+	do {                                                      \
+		int data_size = TYPE_SIZE(identifier->variable_type); \
+		identifier->scope = LOCAL_TABLE;                      \
+		identifier->offset = _offset - data_size;             \
+		_offset -= ALIGN(data_size);                          \
 	} while (0)
 
-#define LOCAL_ARRAY_OFFSET(identifier, _offset, index)    \
-	do {                                                  \
-		int data_size = TYPE_SIZE(identifier->data_type); \
-		identifier->scope = LOCAL_TABLE;                  \
-		identifier->offset = _offset - index * data_size; \
-		_offset -= ALIGN(index * data_size);              \
+#define LOCAL_ARRAY_OFFSET(identifier, _offset, index)        \
+	do {                                                      \
+		int data_size = TYPE_SIZE(identifier->variable_type); \
+		identifier->scope = LOCAL_TABLE;                      \
+		identifier->offset = _offset - index * data_size;     \
+		_offset -= ALIGN(index * data_size);                  \
 	} while (0)
 
 #define OP_TO_CAL(op, a, b)           \
