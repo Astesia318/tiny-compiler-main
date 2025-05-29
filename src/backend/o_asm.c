@@ -300,13 +300,15 @@ void asm_gvar(struct id *a) {
 	input_str(obj_file, "	.type	%s,@object\n", a->name);
 	input_str(obj_file, "	.size %s, %d\n", a->name, data_size);
 	input_str(obj_file, "%s:\n", a->name);
-	if (a->pointer_info.index == NO_INDEX) {
+	if (a->array_info != NO_INDEX) {
+		int total_offset =
+		    a->array_info->array_offset[a->array_info->array_level];
 		input_str(obj_file, "	.zero	%d",
-		          data_size);  // XXX:需要实现全局变量赋值后作改动
+		          total_offset *
+		              data_size);  // XXX:需要实现全局变量赋值后作改动
 	} else {
 		input_str(obj_file, "	.zero	%d",
-		          a->pointer_info.index *
-		              data_size);  // XXX:需要实现全局变量赋值后作改动
+		          data_size);  // XXX:需要实现全局变量赋值后作改动
 	}
 }
 // 生成函数返回对应的汇编代码

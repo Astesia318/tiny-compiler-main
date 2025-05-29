@@ -19,6 +19,9 @@ int oon; /* offset of next frame */
 // 根据单条三地址码，生成汇编代码
 void asm_code(struct tac *code) {
 	int r;
+	struct id *id_1 = code->id_1;
+	struct id *id_2 = code->id_2;
+	struct id *id_3 = code->id_3;
 
 	switch (code->type) {
 		case TAC_UNDEF:
@@ -26,19 +29,19 @@ void asm_code(struct tac *code) {
 			return;
 
 		case TAC_PLUS:
-			asm_bin("add", code->id_1, code->id_2, code->id_3);
+			asm_bin("add", id_1, id_2, id_3);
 			return;
 
 		case TAC_MINUS:
-			asm_bin("sub", code->id_1, code->id_2, code->id_3);
+			asm_bin("sub", id_1, id_2, id_3);
 			return;
 
 		case TAC_MULTIPLY:
-			asm_bin("mul", code->id_1, code->id_2, code->id_3);
+			asm_bin("mul", id_1, id_2, id_3);
 			return;
 
 		case TAC_DIVIDE:
-			asm_bin("div", code->id_1, code->id_2, code->id_3);
+			asm_bin("div", id_1, id_2, id_3);
 			return;
 
 		case TAC_EQ:
@@ -47,55 +50,56 @@ void asm_code(struct tac *code) {
 		case TAC_LE:
 		case TAC_GT:
 		case TAC_GE:
-			asm_cmp(code->type, code->id_1, code->id_2, code->id_3);
+			asm_cmp(code->type, id_1, id_2, id_3);
 			return;
 
 		case TAC_ASSIGN:
 		case TAC_VAR_REFER_INIT:
-			r = reg_find(code->id_2);
-			if (code->id_1->variable_type->data_type ==
-			    code->id_2->variable_type->data_type)
+			r = reg_find(id_2);
+			if (id_1->variable_type->data_type ==
+			    id_2->variable_type->data_type) {
 				rdesc_fill(
-				    r, code->id_1,
+				    r, id_1,
 				    MODIFIED);  // 只有类型相同时覆盖寄存器描述符，防止未截断错误
-			asm_store_var(code->id_1, reg_name[r]);
+			}
+			asm_store_var(id_1, reg_name[r]);
 			return;
 
 		case TAC_INPUT:
-			asm_input(code->id_1);
+			asm_input(id_1);
 			return;
 
 		case TAC_OUTPUT:
-			asm_output(code->id_1);
+			asm_output(id_1);
 			return;
 
 		case TAC_REFER:
-			asm_refer(code->id_1, code->id_2);
+			asm_refer(id_1, id_2);
 			return;
 
 		case TAC_DEREFER_GET:
-			asm_derefer_get(code->id_1, code->id_2);
+			asm_derefer_get(id_1, id_2);
 			return;
 
 		case TAC_DEREFER_PUT:
-			asm_derefer_put(code->id_1, code->id_2);
+			asm_derefer_put(id_1, id_2);
 			return;
 
 		case TAC_GOTO:
-			asm_cond("j", NULL, code->id_1->name);
+			asm_cond("j", NULL, id_1->name);
 			return;
 
 		case TAC_IFZ:
-			asm_cond("beq", code->id_1, code->id_2->name);
+			asm_cond("beq", id_1, id_2->name);
 			return;
 
 		case TAC_LABEL:
 			// for (int r = R_GEN; r < R_NUM; r++) asm_write_back(r);
-			asm_label(code->id_1);
+			asm_label(id_1);
 			return;
 
 		case TAC_ARG:
-			// r = reg_find(code->id_1);
+			// r = reg_find(id_1);
 			// input_str(obj_file, "\tSTO (R2+%d),R%u\n", tof + oon, r);
 			// oon += 4;
 			return;
@@ -105,7 +109,7 @@ void asm_code(struct tac *code) {
 			return;
 
 		case TAC_CALL:
-			asm_call(code, code->id_1, code->id_2);
+			asm_call(code, id_1, id_2);
 			return;
 
 		case TAC_BEGIN:
@@ -122,19 +126,21 @@ void asm_code(struct tac *code) {
 
 		case TAC_VAR:
 			if (scope == LOCAL_TABLE) {
-				if (code->id_1->pointer_info.index != NO_INDEX) {
-					LOCAL_ARRAY_OFFSET(code->id_1, tof,
-					                   code->id_1->pointer_info.index);
+				if (id_1->array_info != NO_INDEX) {
+					int total_offset =
+					    id_1->array_info
+					        ->array_offset[id_1->array_info->array_level];
+					LOCAL_ARRAY_OFFSET(id_1, tof, total_offset);
 				} else {
-					LOCAL_VAR_OFFSET(code->id_1, tof);
+					LOCAL_VAR_OFFSET(id_1, tof);
 				}
 			} else {
-				asm_gvar(code->id_1);
+				asm_gvar(id_1);
 			}
 			return;
 
 		case TAC_RETURN:
-			asm_return(code->id_1);
+			asm_return(id_1);
 			return;
 
 		default:

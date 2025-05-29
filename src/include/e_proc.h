@@ -13,8 +13,9 @@ struct op *process_calculate(struct op *exp_1, struct op *exp_2, int cal);
 struct op *process_int(int integer);
 struct op *process_float(double floatnum);
 struct op *process_char(char character);
-struct op *process_add_identifier(char *name, int index);
-struct op *process_array_identifier(struct op *array_op, int index);
+struct op *process_add_identifier(char *name, struct arr_info *array_info);
+struct op *process_array_identifier(struct op *array_op,
+                                    struct arr_info *index_info);
 struct op *process_identifier(char *name);
 struct op *process_instance_member(char *instance_name, char *member_name);
 struct op *process_pointer_instance_member(char *instance_ptr_name,

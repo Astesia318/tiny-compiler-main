@@ -14,7 +14,7 @@
 #define NUM_ZERO (struct op *)1145141919  // negative占位
 #define NUM_ONE (struct op *)114514       // inc&dec占位
 #define NO_ADDR -1                        // 无地址标识
-#define NO_INDEX 0                        // 无地址标识
+#define NO_INDEX (struct arr_info *)NULL  // 无下标
 
 // 符号表操作方向
 #define INC_HEAD 0  // 增加到表头
@@ -47,11 +47,7 @@
 #define ID_STRUCT 6     // 结构体
 
 // 变量类型
-#define NO_TYPE (void *)0  // 无类型
-// #define UNDEFINED_PTR 0
-// #define NOT_PTR 1
-// #define PTR_VAR 2
-// #define REF_VAR 3
+#define NO_TYPE (struct var_type *)NULL  // 无类型
 
 // 数据类型
 #define PTR_OFFSET 10
@@ -186,9 +182,14 @@ struct var_type {
 	int is_reference;
 };
 
+struct arr_info {
+	int array_level;
+	int array_offset[MAX];
+	int array_index[MAX];
+};
+
 struct ptr_info {
-	int index;
-	int temp_derefer_put;
+	int temp_deref_count;
 	int has_initialized;
 };
 
@@ -211,6 +212,7 @@ struct member_def {
 
 	struct var_type *variable_type;
 
+	struct arr_info *array_info;
 	struct ptr_info pointer_info;
 
 	struct member_def *next_def;
@@ -236,6 +238,7 @@ struct id {
 
 	struct id *next;
 
+	struct arr_info *array_info;
 	struct ptr_info pointer_info;
 	struct num_info number_info;
 	struct func_info function_info;
@@ -285,9 +288,10 @@ struct id *check_struct_type(int struct_type);
 struct id *check_struct_name(char *name);
 struct member_def *find_member(struct id *instance, char *member_name);
 struct id *find_func(const char *name);
-struct member_def *add_member_def_raw(char *name, int index);
+struct member_def *add_member_def_raw(char *name, struct arr_info *array_info);
 struct id *add_identifier(const char *name, int id_type,
-                          struct var_type *variable_type, int index);
+                          struct var_type *variable_type,
+                          struct arr_info *array_info);
 struct id *add_const_identifier(const char *name, int id_type,
                                 struct var_type *variable_type);
 
@@ -310,13 +314,17 @@ struct block *new_block(struct id *label_begin, struct id *label_end);
 struct var_type *new_var_type(int data_type, int pointer_level,
                               int is_reference);
 struct var_type *new_const_type(int data_type, int pointer_level);
+struct arr_info *new_array_info(int first_level_size);
 
 // 字符串处理
 const char *id_to_str(struct id *id);
-const char *data_to_str(struct var_type *variable_type);
+const char *data_to_str(struct var_type *variable_type,
+                        struct arr_info *array_info);
 void output_tac(FILE *f, struct tac *code);
 void output_struct(FILE *f, struct id *id_struct);
 void source_to_tac(FILE *f, struct tac *code);
 void input_str(FILE *f, const char *format, ...);
+
+struct arr_info *increase_array_level(struct arr_info *array_info, int size);
 
 #endif
