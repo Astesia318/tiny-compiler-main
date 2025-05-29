@@ -109,6 +109,36 @@ struct id *find_func(const char *name) {
 	                        CHECK_ID_EXIST);
 }
 
+struct id *check_struct_type(int struct_type) {
+	struct id *cur_struct = struct_table;
+	while (cur_struct) {
+		if (cur_struct->struct_info.struct_type == struct_type) {
+			return cur_struct;
+		}
+		cur_struct = cur_struct->next;
+	}
+	perror("no struct found");
+#ifndef HJJ_DEBUG
+	exit(0);
+#endif
+	return NULL;
+}
+
+struct id *check_struct_name(char *name) {
+	struct id *cur_struct = struct_table;
+	while (cur_struct) {
+		if (!strcmp(cur_struct->name,name)) {
+			return cur_struct;
+		}
+		cur_struct = cur_struct->next;
+	}
+	perror("no struct found");
+#ifndef HJJ_DEBUG
+	exit(0);
+#endif
+	return NULL;
+}
+
 struct id *add_identifier(const char *name, int id_type, int data_type,
                           int index) {
 	// lyc:对于text float double类型常量将其放到全局表里
@@ -288,10 +318,14 @@ void output_struct(FILE *f, struct id *id_struct) {
 	}
 }
 
-const char *data_to_str(int type) {
-	if (type == NO_TYPE) return "NULL";
+const char *data_to_str(int data_type) {
+	if (data_type == NO_TYPE) return "NULL";
 
-	switch (type) {
+	if (data_type >= DATA_STRUCT_INIT) {
+		return check_struct_type(data_type)->name;
+	}
+
+	switch (data_type) {
 		case DATA_INT:
 			return "int";
 		case DATA_LONG:
@@ -324,7 +358,7 @@ const char *data_to_str(int type) {
 			return "char_ref";
 		default:
 			perror("unknown data type");
-			printf("id type: %d\n", type);
+			printf("id type: %d\n", data_type);
 			return "?";
 	}
 }

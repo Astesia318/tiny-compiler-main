@@ -280,17 +280,23 @@ struct op *process_expression_list(struct op *arg_list_pre,
 	return exp_list;
 }
 
+int process_struct_type(char *name) {
+	return check_struct_name(name)->struct_info.struct_type;
+}
+
 /**************************************/
 /************* statement **************/
 /**************************************/
 // 可以考虑用注释形式放到三地址文件？
-struct op *process_member_definition(char *name,
+struct op *process_struct_definition(char *name,
                                      struct member_def *definition_block) {
 	struct op *struct_op = new_op();
+	static int cur_struct_type = DATA_STRUCT_INIT;
 
 	struct id *new_struct = add_identifier(name, ID_STRUCT, NO_TYPE, NO_INDEX);
 	new_struct->struct_info.definition_list = definition_block;
 	new_struct->struct_info.next_struct = struct_table;
+	new_struct->struct_info.struct_type = cur_struct_type++;
 	struct_table = new_struct;
 
 	return struct_op;

@@ -16,8 +16,9 @@ struct op *process_char(char character);
 struct op *process_add_identifier(char *name, int index);
 struct op *process_array_identifier(struct op *array_op, int index);
 struct op *process_identifier(char *name);
+int process_struct_type(char *name);
 
-struct op *process_member_definition(char *name, struct member_def *definition_block);
+struct op *process_struct_definition(char *name, struct member_def *definition_block);
 struct member_def *process_definition(int data_type, struct member_def *member_list);
 struct member_def *process_add_member(char *name, int index);
 struct op *process_declaration(int data_type, struct op *exp_1);
