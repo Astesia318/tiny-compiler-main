@@ -21,6 +21,8 @@ void yyerror(char* msg);
 %union {
     struct op *operation;
     struct member_def *definition;
+    struct arr_info *array_info;
+    struct var_type *variable_type;
 
     char* name;
     char* string;
@@ -29,9 +31,7 @@ void yyerror(char* msg);
     double num_float;
     char num_char;
 
-    // int data_type;
     int data_type;
-    struct var_type *variable_type;
 
     int index;
 }
@@ -48,7 +48,8 @@ void yyerror(char* msg);
 %token <data_type> DOUBLE
 %token <data_type> CHAR
 %token <index> INDEX
-%type <index> index_or_null
+%type <array_info> index
+%type <array_info> index_or_null
 %type <variable_type> void_type
 %type <variable_type> complex_type
 %type <variable_type> pointer_type
@@ -93,7 +94,7 @@ void yyerror(char* msg);
 %type <operation> expression_or_null
 %type <operation> const_val
 %type <operation> add_identifier
-%type <operation> array_identifier
+%type <operation> existed_array_identifier
 %type <operation> existed_identifier
 
 %token EQ NE LT LE GT GE
@@ -236,7 +237,7 @@ expression_list : expression_list ',' right_val { $$ = process_expression_list($
 
 left_val : '*' expression { $$ = process_derefer_put($2); }
 | '*' existed_identifier { $$ = process_derefer_put($2); }
-| array_identifier { $$ = process_derefer_put($1); }
+| existed_array_identifier { $$ = process_derefer_put($1); }
 | existed_identifier { $$ = cpy_op($1); }
 ;
 
@@ -245,7 +246,7 @@ right_val : expression { $$ = cpy_op($1); }
 | '&' expression { $$ = process_reference($2); }
 | '*' existed_identifier { $$ = process_derefer_get($2); }
 | '&' existed_identifier { $$ = process_reference($2); }
-| array_identifier { $$ = process_derefer_get($1); }
+| existed_array_identifier { $$ = process_derefer_get($1); }
 | existed_identifier { $$ = cpy_op($1); }
 | const_val { $$ = cpy_op($1); }
 ;
@@ -287,7 +288,7 @@ const_val : NUM_INT { $$ = process_int($1); }
 // 这么写是因为改成star_or_null的形式会出现神秘的无法解析全局变量的冲突
 add_identifier : IDENTIFIER index_or_null { $$ = process_add_identifier($1,$2) }
 
-array_identifier : existed_identifier INDEX { $$ = process_array_identifier($1,$2); }
+existed_array_identifier : existed_identifier index { $$ = process_array_identifier($1,$2); free($2); }
 
 existed_identifier : IDENTIFIER '.' IDENTIFIER { $$ = process_instance_member($1,$3); }
 | IDENTIFIER PSTRUCT_ACCESS IDENTIFIER { $$ = process_pointer_instance_member($1,$3); }
@@ -311,8 +312,12 @@ basic_type : INT { $$ = new_var_type(DATA_INT,0,0); }
 | STRUCT IDENTIFIER { $$ = process_struct_type($2,0,0); }
 ;
 
-index_or_null : INDEX { $$ = $1; }
+index_or_null : index { $$ = $1; }
 | { $$ = NO_INDEX; }
+;
+
+index : index INDEX { $$ = increase_array_level($1,$2); }
+| INDEX { $$ = new_array_info($1); }
 ;
 
 %%

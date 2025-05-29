@@ -77,8 +77,8 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 			struct id *label_1 = new_label();
 			struct id *label_2 = new_label();
 
-			struct id *const_0 = add_const_identifier(
-			    "0", ID_NUM, new_const_type(DATA_INT, 0));
+			struct id *const_0 =
+			    add_const_identifier("0", ID_NUM, new_const_type(DATA_INT, 0));
 			const_0->number_info.num.num_int = 0;
 			struct id *const_1 = add_const_identifier(
 			    "1.0", ID_NUM, new_const_type(DATA_FLOAT, 0));
@@ -102,7 +102,8 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 }
 
 // 处理数组标识符
-struct op *process_array_identifier(struct op *array_op, int index) {
+struct op *process_array_identifier(struct op *array_op,
+                                    struct arr_info *index_info) {
 	struct op *id_op = new_op();
 
 	struct id *array = array_op->addr;
@@ -112,20 +113,36 @@ struct op *process_array_identifier(struct op *array_op, int index) {
 		exit(0);
 #endif
 	}
+	if (array->array_info->array_level < index_info->array_level) {
+		perror("index level too large");
+#ifndef HJJ_DEBUG
+		exit(0);
+#endif
+	}
 
 	struct id *t = new_temp(array->variable_type);
-	struct op *num_op = process_int(index * TYPE_SIZE(array->variable_type));
-	id_op->addr = t;
 	cat_tac(id_op, NEW_TAC_1(TAC_VAR, t));
-	cat_tac(id_op, NEW_TAC_3(TAC_PLUS, t, array, num_op->addr));
+	cat_tac(id_op, NEW_TAC_2(TAC_ASSIGN, t, array));
+	int deref_count = 0;
+	for (int cur_level = 0; cur_level <= index_info->array_level; cur_level++) {
+		t = new_temp(array->variable_type);
+		struct op *num_op =
+		    process_int(array->array_info->array_offset[cur_level] *
+		                TYPE_SIZE(array->variable_type));
+		cat_tac(id_op, NEW_TAC_1(TAC_VAR, t));
+		cat_tac(id_op, NEW_TAC_3(TAC_PLUS, t, t, num_op->addr));
+		deref_count++;
+	}
+	t->pointer_info.temp_deref_count = deref_count;
+	id_op->addr = t;
 
 	return id_op;
 }
 
-struct op *process_add_identifier(char *name, int index) {
+struct op *process_add_identifier(char *name, struct arr_info *array_info) {
 	struct op *id_op = new_op();
 
-	struct id *var = add_identifier(name, ID_VAR, NO_TYPE, index);
+	struct id *var = add_identifier(name, ID_VAR, NO_TYPE, array_info);
 
 	cat_tac(id_op, NEW_TAC_1(TAC_VAR, var));
 
@@ -306,8 +323,6 @@ struct op *process_argument_list(struct op *raw_exp_list) {
 	cat_op(argument_list, raw_exp_list);
 	cat_tac(argument_list, arg_list_head);
 
-	struct tac *arg = arg_list_head;
-
 	return argument_list;
 }
 
@@ -372,9 +387,14 @@ struct member_def *process_definition(struct var_type *variable_type,
                                       struct member_def *definition_list) {
 	struct member_def *cur_definition = definition_list;
 	while (cur_definition) {
+		if (cur_definition->array_info != NO_INDEX) {
+			cur_definition->variable_type->pointer_level =
+			    cur_definition->array_info->array_level + 1;
+		}
 		cur_definition->variable_type = variable_type;
 		cur_definition->member_offset = cur_member_offset;
 		cur_member_offset += TYPE_SIZE(variable_type);
+
 		cur_definition = cur_definition->next_def;
 	}
 	return definition_list;
@@ -388,10 +408,14 @@ struct op *process_declaration(struct var_type *variable_type,
 	struct tac *cur_declaration = declaration_exp->code;
 	while (
 	    cur_declaration) {  // 逐个修改包含已声明变量的declaration_exp表达式所含变量的类型
-		cur_declaration->id_1->variable_type = variable_type;
-		if (cur_declaration->id_1->pointer_info.index != NO_INDEX) {
-			cur_declaration->id_1->variable_type->pointer_level = 1;
+		struct id *cur_id = cur_declaration->id_1;
+
+		cur_id->variable_type = variable_type;
+		if (cur_id->array_info != NO_INDEX) {
+			cur_id->variable_type->pointer_level =
+			    cur_id->array_info->array_level + 1;
 		}
+
 		cur_declaration = cur_declaration->next;
 	}
 	cat_op(declaration, declaration_exp);
@@ -550,7 +574,6 @@ struct op *process_call(char *name, struct op *arg_list) {
 	struct id *t = new_temp(func->variable_type);
 	call_stat->addr = t;
 
-	struct tac *arg = arg_list->code;
 	struct op *cast_arg_list =
 	    param_args_type_casting(func->function_info.param_list, arg_list);
 
@@ -592,8 +615,8 @@ struct op *process_output_variable(char *name) {
 struct op *process_output_text(char *string) {
 	struct op *output_stat = new_op();
 
-	struct id *str = add_const_identifier(
-	    string, ID_STRING, new_const_type(DATA_UNDEFINED, 0));
+	struct id *str = add_const_identifier(string, ID_STRING,
+	                                      new_const_type(DATA_UNDEFINED, 0));
 
 	cat_tac(output_stat, NEW_TAC_1(TAC_OUTPUT, str));
 
@@ -623,9 +646,9 @@ struct op *process_assign(struct op *leftval_op, struct op *exp) {
 	if (!TYPE_CHECK(leftval, exp_temp) &&
 	    !REF_TO_CONTENT(leftval->variable_type, exp_temp->variable_type) &&
 	    !CONTENT_TO_REF(leftval->variable_type, exp_temp->variable_type) &&
-	    !(leftval->pointer_info.temp_derefer_put &&
-	      leftval->variable_type->pointer_level - 1 ==
-	          exp_temp->variable_type->pointer_level)) {
+	    !(leftval->variable_type->pointer_level -
+	          leftval->pointer_info.temp_deref_count ==
+	      exp_temp->variable_type->pointer_level)) {
 		struct op *cast_exp = type_casting(leftval, exp_temp);
 		exp_temp = cast_exp->addr;
 		cat_op(assign_stat, cast_exp);
@@ -636,7 +659,7 @@ struct op *process_assign(struct op *leftval_op, struct op *exp) {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, leftval, exp_temp));
 	} else if (exp_temp->variable_type->is_reference) {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_GET, leftval, exp_temp));
-	} else if (leftval->pointer_info.temp_derefer_put) {
+	} else if (leftval->pointer_info.temp_deref_count) {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, leftval, exp_temp));
 	} else {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, leftval, exp_temp));
@@ -660,7 +683,7 @@ struct op *process_derefer_put(struct op *id_op) {
 	}
 
 	struct id *t = new_temp(var->variable_type);
-	t->pointer_info.temp_derefer_put = 1;
+	t->pointer_info.temp_deref_count = var->pointer_info.temp_deref_count;
 	content_stat->addr = t;
 
 	cat_op(content_stat, id_op);

@@ -62,8 +62,9 @@ static struct id *_collide_identifier(const char *name, int id_type,
 
 static struct id *_add_identifier(const char *name, int id_type,
                                   struct var_type *variable_type,
-                                  struct id **id_table, int index) {
-	struct id *id_wanted;
+                                  struct id **id_table,
+                                  struct arr_info *array_info) {
+	struct id *new_id;
 
 	struct id *id_collision = _collide_identifier(name, id_type, variable_type);
 	if (id_collision) {  // 表内有同名id
@@ -80,21 +81,21 @@ static struct id *_add_identifier(const char *name, int id_type,
 		// 字符常量与标识符名冲突，正常添加XXX:现在会添加多个除GCONST外的相同常量
 	}
 	// 没有冲突，向表内添加
-	MALLOC_AND_SET_ZERO(id_wanted, 1, struct id);
+	MALLOC_AND_SET_ZERO(new_id, 1, struct id);
 	char *id_name = (char *)malloc(sizeof(char) * strlen(name));
 	strcpy(id_name, name);
-	id_wanted->name = id_name;
-	id_wanted->id_type = id_type;
-	id_wanted->variable_type = variable_type;
-	id_wanted->pointer_info.index = index;
-	id_wanted->next = *id_table;
-	*id_table = id_wanted;
-	id_wanted->offset = -1; /* Unset address */
+	new_id->name = id_name;
+	new_id->id_type = id_type;
+	new_id->variable_type = variable_type;
+	new_id->array_info = array_info;
+	new_id->next = *id_table;
+	*id_table = new_id;
+	new_id->offset = -1; /* Unset address */
 	if (ID_IS_GCONST(id_type, variable_type->data_type)) {
-		id_wanted->label = lc_amount++;
+		new_id->label = lc_amount++;
 	}
 
-	return id_wanted;
+	return new_id;
 }
 // lyc:若在local表没找见，则需要从global表里找
 struct id *find_identifier(const char *name) {
@@ -161,16 +162,17 @@ struct member_def *find_member(struct id *instance, char *member_name) {
 }
 
 struct id *add_identifier(const char *name, int id_type,
-                          struct var_type *variable_type, int index) {
+                          struct var_type *variable_type,
+                          struct arr_info *array_info) {
 	// lyc:对于text float double类型常量将其放到全局表里
 	// hjj: so as function and struct...原因是类型转换时会添加func,
 	// 这个func应当到global table。 hjj: 不过到层次结构可能会改变
 	if (ID_IS_GCONST(id_type, variable_type->data_type))
 		return _add_identifier(name, id_type, variable_type,
-		                       _choose_id_table(GLOBAL_TABLE), index);
+		                       _choose_id_table(GLOBAL_TABLE), array_info);
 	else
 		return _add_identifier(name, id_type, variable_type,
-		                       _choose_id_table(scope), index);
+		                       _choose_id_table(scope), array_info);
 }
 
 struct id *add_const_identifier(const char *name, int id_type,
@@ -178,14 +180,14 @@ struct id *add_const_identifier(const char *name, int id_type,
 	return add_identifier(name, id_type, variable_type, NO_INDEX);
 }
 
-struct member_def *add_member_def_raw(char *name, int index) {
+struct member_def *add_member_def_raw(char *name, struct arr_info *array_info) {
 	struct member_def *new_def;
 
 	MALLOC_AND_SET_ZERO(new_def, 1, struct member_def);
 	char *member_name = (char *)malloc(sizeof(char) * strlen(name));
 	strcpy(member_name, name);
 	new_def->name = member_name;
-	new_def->pointer_info.index = index;
+	new_def->array_info = array_info;
 
 	return new_def;
 }
@@ -269,7 +271,8 @@ struct op *new_op() {
 
 struct tac *new_tac(int type, struct id *id_1, struct id *id_2,
                     struct id *id_3) {
-	struct tac *ntac = (struct tac *)malloc(sizeof(struct tac));
+	struct tac *ntac;
+	MALLOC_AND_SET_ZERO(ntac, 1, struct tac);
 
 	ntac->type = type;
 	ntac->next = NULL;
@@ -284,7 +287,6 @@ struct tac *new_tac(int type, struct id *id_1, struct id *id_2,
 struct id *new_temp(struct var_type *variable_type) {
 	NAME_ALLOC(buf);
 	sprintf(buf, "t%d", temp_amount++);  // hjj: todo, check collision
-	// return add_identifier(buf, ID_TEMP, data_type, NO_INDEX,
 	return add_identifier(buf, ID_VAR, variable_type, NO_INDEX);
 }
 
@@ -317,6 +319,22 @@ struct var_type *new_const_type(int data_type, int pointer_level) {
 	return new_var_type(data_type, pointer_level, 0);
 }
 
+struct arr_info *increase_array_level(struct arr_info *array_info, int size) {
+	array_info->array_level += 1;
+	array_info->array_index[array_info->array_level] = size;
+	array_info->array_offset[array_info->array_level] *= size;
+	return array_info;
+}
+
+struct arr_info *new_array_info(int first_level_size) {
+	struct arr_info *new_info;
+	MALLOC_AND_SET_ZERO(new_info, 1, struct arr_info);
+	new_info->array_level = 0;
+	new_info->array_index[0] = first_level_size;
+	new_info->array_offset[0] = 1;
+	return new_info;
+}
+
 const char *id_to_str(struct id *id) {
 	if (id == NULL) return "NULL";
 
@@ -344,20 +362,30 @@ void output_struct(FILE *f, struct id *id_struct) {
 	PRINT_1("struct %s\n", id_struct->name);
 	struct member_def *cur_definition = id_struct->struct_info.definition_list;
 	while (cur_definition) {
-		if (cur_definition->pointer_info.index == NO_INDEX) {
+		if (cur_definition->array_info == NO_INDEX) {
 			PRINT_2("member %s %s\n",
-			        data_to_str(cur_definition->variable_type),
+			        data_to_str(cur_definition->variable_type,
+			                    cur_definition->array_info),
 			        cur_definition->name);
 		} else {
-			PRINT_3("member %s %s[%d]\n",
-			        data_to_str(cur_definition->variable_type),
-			        cur_definition->name, cur_definition->pointer_info.index);
+			PRINT_2("member %s %s\n",
+			        data_to_str(cur_definition->variable_type,
+			                    cur_definition->array_info),
+			        cur_definition->name);
+			for (int cur_level = 0;
+			     cur_level <= cur_definition->array_info->array_level;
+			     cur_level++) {
+				PRINT_1("[%d]",
+				        cur_definition->array_info->array_index[cur_level]);
+			}
+			PRINT_0("\n");
 		}
 		cur_definition = cur_definition->next_def;
 	}
 }
 
-const char *data_to_str(struct var_type *variable_type) {
+const char *data_to_str(struct var_type *variable_type,
+                        struct arr_info *array_info) {
 	int data_type = variable_type->data_type;
 	char *buf = (char *)malloc(NAME_SIZE);
 
@@ -389,10 +417,12 @@ const char *data_to_str(struct var_type *variable_type) {
 				break;
 		}
 	}
-	int cur_pointer = 0;
-	while (cur_pointer != variable_type->pointer_level) {
-		strcat(buf, "*");
-		cur_pointer++;
+	if (array_info == NO_INDEX) {
+		int cur_pointer = 0;
+		while (cur_pointer != variable_type->pointer_level) {
+			strcat(buf, "*");
+			cur_pointer++;
+		}
 	}
 	if (variable_type->is_reference) {
 		strcat(buf, " &");
@@ -401,129 +431,142 @@ const char *data_to_str(struct var_type *variable_type) {
 }
 
 void output_tac(FILE *f, struct tac *code) {
+	struct id *id_1 = code->id_1;
+	struct id *id_2 = code->id_2;
+	struct id *id_3 = code->id_3;
 	switch (code->type) {
 		case TAC_PLUS:
-			PRINT_3("%s = %s + %s\n", id_to_str(code->id_1),
-			        id_to_str(code->id_2), id_to_str(code->id_3));
+			PRINT_3("%s = %s + %s\n", id_to_str(id_1), id_to_str(id_2),
+			        id_to_str(id_3));
 			break;
 
 		case TAC_MINUS:
-			PRINT_3("%s = %s - %s\n", id_to_str(code->id_1),
-			        id_to_str(code->id_2), id_to_str(code->id_3));
+			PRINT_3("%s = %s - %s\n", id_to_str(id_1), id_to_str(id_2),
+			        id_to_str(id_3));
 			break;
 
 		case TAC_MULTIPLY:
-			PRINT_3("%s = %s * %s\n", id_to_str(code->id_1),
-			        id_to_str(code->id_2), id_to_str(code->id_3));
+			PRINT_3("%s = %s * %s\n", id_to_str(id_1), id_to_str(id_2),
+			        id_to_str(id_3));
 			break;
 
 		case TAC_DIVIDE:
-			PRINT_3("%s = %s / %s\n", id_to_str(code->id_1),
-			        id_to_str(code->id_2), id_to_str(code->id_3));
+			PRINT_3("%s = %s / %s\n", id_to_str(id_1), id_to_str(id_2),
+			        id_to_str(id_3));
 			break;
 
 		case TAC_EQ:
-			PRINT_3("%s = (%s == %s)\n", id_to_str(code->id_1),
-			        id_to_str(code->id_2), id_to_str(code->id_3));
+			PRINT_3("%s = (%s == %s)\n", id_to_str(id_1), id_to_str(id_2),
+			        id_to_str(id_3));
 			break;
 
 		case TAC_NE:
-			PRINT_3("%s = (%s != %s)\n", id_to_str(code->id_1),
-			        id_to_str(code->id_2), id_to_str(code->id_3));
+			PRINT_3("%s = (%s != %s)\n", id_to_str(id_1), id_to_str(id_2),
+			        id_to_str(id_3));
 			break;
 
 		case TAC_LT:
-			PRINT_3("%s = (%s < %s)\n", id_to_str(code->id_1),
-			        id_to_str(code->id_2), id_to_str(code->id_3));
+			PRINT_3("%s = (%s < %s)\n", id_to_str(id_1), id_to_str(id_2),
+			        id_to_str(id_3));
 			break;
 
 		case TAC_LE:
-			PRINT_3("%s = (%s <= %s)\n", id_to_str(code->id_1),
-			        id_to_str(code->id_2), id_to_str(code->id_3));
+			PRINT_3("%s = (%s <= %s)\n", id_to_str(id_1), id_to_str(id_2),
+			        id_to_str(id_3));
 			break;
 
 		case TAC_GT:
-			PRINT_3("%s = (%s > %s)\n", id_to_str(code->id_1),
-			        id_to_str(code->id_2), id_to_str(code->id_3));
+			PRINT_3("%s = (%s > %s)\n", id_to_str(id_1), id_to_str(id_2),
+			        id_to_str(id_3));
 			break;
 
 		case TAC_GE:
-			PRINT_3("%s = (%s >= %s)\n", id_to_str(code->id_1),
-			        id_to_str(code->id_2), id_to_str(code->id_3));
+			PRINT_3("%s = (%s >= %s)\n", id_to_str(id_1), id_to_str(id_2),
+			        id_to_str(id_3));
 			break;
 
 		case TAC_REFER:
-			PRINT_2("%s = &%s\n", id_to_str(code->id_1), id_to_str(code->id_2));
+			PRINT_2("%s = &%s\n", id_to_str(id_1), id_to_str(id_2));
 			break;
 
 		case TAC_DEREFER_PUT:
-			PRINT_2("*%s = %s\n", id_to_str(code->id_1), id_to_str(code->id_2));
+			int cur_deref = 0;
+			while (cur_deref != id_1->pointer_info.temp_deref_count) {
+				printf("*");
+				cur_deref++;
+			}
+			PRINT_2("%s = %s\n", id_to_str(id_1), id_to_str(id_2));
 			break;
 
 		case TAC_DEREFER_GET:
-			PRINT_2("%s = *%s\n", id_to_str(code->id_1), id_to_str(code->id_2));
+			PRINT_2("%s = *%s\n", id_to_str(id_1), id_to_str(id_2));
 			break;
 
 		case TAC_VAR_REFER_INIT:
-			PRINT_2("ref init %s = %s\n", id_to_str(code->id_1),
-			        id_to_str(code->id_2));
+			PRINT_2("ref init %s = %s\n", id_to_str(id_1), id_to_str(id_2));
 			break;
 
 		case TAC_ASSIGN:
-			PRINT_2("%s = %s\n", id_to_str(code->id_1), id_to_str(code->id_2));
+			PRINT_2("%s = %s\n", id_to_str(id_1), id_to_str(id_2));
 			break;
 
 		case TAC_GOTO:
-			PRINT_1("goto %s\n", code->id_1->name);
+			PRINT_1("goto %s\n", id_1->name);
 			break;
 
 		case TAC_IFZ:
-			PRINT_2("ifz %s goto %s\n", id_to_str(code->id_1),
-			        code->id_2->name);
+			PRINT_2("ifz %s goto %s\n", id_to_str(id_1), id_2->name);
 			break;
 
 		case TAC_ARG:
-			PRINT_2("arg %s %s\n", data_to_str(code->id_1->variable_type),
-			        id_to_str(code->id_1));
+			PRINT_2("arg %s %s\n",
+			        data_to_str(id_1->variable_type, id_1->array_info),
+			        id_to_str(id_1));
 			break;
 
 		case TAC_PARAM:
-			PRINT_2("param %s %s\n", data_to_str(code->id_1->variable_type),
-			        id_to_str(code->id_1));
+			PRINT_2("param %s %s\n",
+			        data_to_str(id_1->variable_type, id_1->array_info),
+			        id_to_str(id_1));
 			break;
 
 		case TAC_CALL:
-			if (code->id_1 == NULL)
-				PRINT_1("call %s\n", (char *)code->id_2);
+			if (id_1 == NULL)
+				PRINT_1("call %s\n", (char *)id_2);
 			else
-				PRINT_2("%s = call %s\n", id_to_str(code->id_1),
-				        id_to_str(code->id_2));
+				PRINT_2("%s = call %s\n", id_to_str(id_1), id_to_str(id_2));
 			break;
 
 		case TAC_INPUT:
-			PRINT_1("input %s\n", id_to_str(code->id_1));
+			PRINT_1("input %s\n", id_to_str(id_1));
 			break;
 
 		case TAC_OUTPUT:
-			PRINT_1("output %s\n", id_to_str(code->id_1));
+			PRINT_1("output %s\n", id_to_str(id_1));
 			break;
 
 		case TAC_RETURN:
-			PRINT_1("return %s\n", id_to_str(code->id_1));
+			PRINT_1("return %s\n", id_to_str(id_1));
 			break;
 
 		case TAC_LABEL:
-			PRINT_1("label %s\n", id_to_str(code->id_1));
+			PRINT_1("label %s\n", id_to_str(id_1));
 			break;
 
 		case TAC_VAR:
-			if (code->id_1->pointer_info.index == NO_INDEX) {
-				PRINT_2("var %s %s\n", data_to_str(code->id_1->variable_type),
-				        id_to_str(code->id_1));
+			if (id_1->array_info == NO_INDEX) {
+				PRINT_2("var %s %s\n",
+				        data_to_str(id_1->variable_type, id_1->array_info),
+				        id_to_str(id_1));
 			} else {
-				PRINT_3("var %s %s[%d]\n",
-				        data_to_str(code->id_1->variable_type),
-				        id_to_str(code->id_1), code->id_1->pointer_info.index);
+				PRINT_2("var %s %s",
+				        data_to_str(id_1->variable_type, id_1->array_info),
+				        id_to_str(id_1));
+				for (int cur_level = 0;
+				     cur_level <= id_1->array_info->array_level; cur_level++) {
+					PRINT_1("[%d]", id_1->array_info->array_index[cur_level]);
+				}
+				PRINT_0("\n");
 			}
 			break;
 
