@@ -163,6 +163,8 @@ struct member_def *find_member(struct id *instance, char *member_name) {
 struct id *add_identifier(const char *name, int id_type,
                           struct var_type *variable_type, int index) {
 	// lyc:对于text float double类型常量将其放到全局表里
+	// hjj: so as function and struct...原因是类型转换时会添加func, 这个func应当到global table。
+	// hjj: 不过到层次结构可能会改变
 	if (ID_IS_GCONST(id_type, variable_type->data_type))
 		return _add_identifier(name, id_type, variable_type,
 		                       _choose_id_table(GLOBAL_TABLE), index);
@@ -455,7 +457,8 @@ void output_tac(FILE *f, struct tac *code) {
 			break;
 
 		case TAC_VAR_REFER_INIT:
-			PRINT_2("ref init %s = %s\n", id_to_str(code->id_1), id_to_str(code->id_2));
+			PRINT_2("ref init %s = %s\n", id_to_str(code->id_1),
+			        id_to_str(code->id_2));
 			break;
 
 		case TAC_ASSIGN:
@@ -551,6 +554,10 @@ void source_to_tac(FILE *f, struct tac *code) {
 void input_str(FILE *f, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
+#ifdef HJJ_DEBUG
+	vfprintf(stdout, format, args);
+#else
 	vfprintf(f, format, args);
+#endif
 	va_end(args);
 }

@@ -37,17 +37,17 @@
 #define IS_ASSIGN 1
 
 // 符号类型
-#define ID_NO_TYPE -1  		// 无类型
-#define ID_UNDEFINED 0		// 未定义类型
-#define ID_VAR 1       	    // 变量
-#define ID_FUNC 2     	    // 函数
-#define ID_NUM 3     		// 数字常量
-#define ID_LABEL 4   		// 标签
-#define ID_STRING 5  		// 字符串
-#define ID_STRUCT 6  		// 结构体
+#define ID_NO_TYPE -1   // 无类型
+#define ID_UNDEFINED 0  // 未定义类型
+#define ID_VAR 1        // 变量
+#define ID_FUNC 2       // 函数
+#define ID_NUM 3        // 数字常量
+#define ID_LABEL 4      // 标签
+#define ID_STRING 5     // 字符串
+#define ID_STRUCT 6     // 结构体
 
 // 变量类型
-#define NO_TYPE (void *)0	// 无类型
+#define NO_TYPE (void *)0  // 无类型
 #define UNDEFINED_PTR 0
 #define NOT_PTR 1
 #define PTR_VAR 2
@@ -56,13 +56,13 @@
 // 数据类型
 #define PTR_OFFSET 10
 #define REF_OFFSET 20
-#define DATA_VOID -1     	// 空数据类型 // hjj: todo, 尚未实装检测return
-#define DATA_UNDEFINED 0 	// 无数据类型（未定义）
-#define DATA_INT 1       	// 整型
-#define DATA_LONG 2      	// 长整型
-#define DATA_FLOAT 3     	// 浮点型
-#define DATA_DOUBLE 4    	// 双精度浮点型
-#define DATA_CHAR 5      	// 单字符型
+#define DATA_VOID -1      // 空数据类型 // hjj: todo, 尚未实装检测return
+#define DATA_UNDEFINED 0  // 无数据类型（未定义）
+#define DATA_INT 1        // 整型
+#define DATA_LONG 2       // 长整型
+#define DATA_FLOAT 3      // 浮点型
+#define DATA_DOUBLE 4     // 双精度浮点型
+#define DATA_CHAR 5       // 单字符型
 #define DATA_STRUCT_INIT 100
 
 // #define DATA_IS_POINTER(type) ((type >= DATA_PINT) && (type <= DATA_PCHAR))
@@ -87,37 +87,37 @@
 	 (type_1)->pointer_type == PTR_VAR && (type_2)->pointer_type == REF_VAR)
 
 // 三地址码类型
-#define TAC_UNDEF -1        // 未定义
-#define TAC_END 0           // 结束
-#define TAC_LABEL 1         // 标签
-#define TAC_BEGIN 2         // 函数开始
-#define TAC_PARAM 3         // 参数
-#define TAC_VAR 4           // 变量声明
-#define TAC_IFZ 5           // 条件跳转（if not）
-#define TAC_CALL 6          // 函数调用
-#define TAC_RETURN 7        // 返回
-#define TAC_OUTPUT 8        // 输出
-#define TAC_INPUT 9         // 输入
-#define TAC_ASSIGN 10       // 赋值
-#define TAC_NEGATIVE 12     // 取负
-#define TAC_INTEGER 13      // 整数常量
-#define TAC_IDENTIFIER 14   // 标识符
-#define TAC_ARG 15          // 函数参数
-#define TAC_GOTO 16         // 无条件跳转
-#define TAC_PLUS 20         // 加法
-#define TAC_MINUS 21        // 减法
-#define TAC_MULTIPLY 22     // 乘法
-#define TAC_DIVIDE 23       // 除法
-#define TAC_EQ 24           // 等于
-#define TAC_NE 25           // 不等于
-#define TAC_LT 26           // 小于
-#define TAC_LE 27           // 小于等于
-#define TAC_GT 28           // 大于
-#define TAC_GE 29           // 大于等于
-#define TAC_REFER 30        // 引用
-#define TAC_DEREFER_PUT 31  // 解引用并赋值
-#define TAC_DEREFER_GET 32  // 解引用但不赋值
-#define TAC_VAR_REFER_INIT 33	// 初始化引用变量
+#define TAC_UNDEF -1           // 未定义
+#define TAC_END 0              // 结束
+#define TAC_LABEL 1            // 标签
+#define TAC_BEGIN 2            // 函数开始
+#define TAC_PARAM 3            // 参数
+#define TAC_VAR 4              // 变量声明
+#define TAC_IFZ 5              // 条件跳转（if not）
+#define TAC_CALL 6             // 函数调用
+#define TAC_RETURN 7           // 返回
+#define TAC_OUTPUT 8           // 输出
+#define TAC_INPUT 9            // 输入
+#define TAC_ASSIGN 10          // 赋值
+#define TAC_NEGATIVE 12        // 取负
+#define TAC_INTEGER 13         // 整数常量
+#define TAC_IDENTIFIER 14      // 标识符
+#define TAC_ARG 15             // 函数参数
+#define TAC_GOTO 16            // 无条件跳转
+#define TAC_PLUS 20            // 加法
+#define TAC_MINUS 21           // 减法
+#define TAC_MULTIPLY 22        // 乘法
+#define TAC_DIVIDE 23          // 除法
+#define TAC_EQ 24              // 等于
+#define TAC_NE 25              // 不等于
+#define TAC_LT 26              // 小于
+#define TAC_LE 27              // 小于等于
+#define TAC_GT 28              // 大于
+#define TAC_GE 29              // 大于等于
+#define TAC_REFER 30           // 引用
+#define TAC_DEREFER_PUT 31     // 解引用并赋值
+#define TAC_DEREFER_GET 32     // 解引用但不赋值
+#define TAC_VAR_REFER_INIT 33  // 初始化引用变量
 
 #define BUF_ALLOC(buf) char buf[BUF_SIZE] = {0};
 
@@ -135,18 +135,17 @@
 	pointer = (type *)malloc((amount) * sizeof(type)); \
 	memset(pointer, 0, (amount) * sizeof(type));
 
-#define NEW_BUILT_IN_FUNC_ID(identifier, func_name, type) \
-	MALLOC_AND_SET_ZERO(identifier, 1, struct id);        \
-	identifier->name = func_name;                         \
-	identifier->id_type = ID_FUNC;                        \
-	identifier->variable_type->data_type = type;          \
+#define NEW_BUILT_IN_FUNC_ID(identifier, func_name, data_type)           \
+	identifier = add_const_identifier(func_name, ID_FUNC,                \
+	                                  new_var_type(data_type, NOT_PTR)); \
 	identifier->offset = -1;
 
 #define TAC_IS_CMP(cal) (cal >= TAC_EQ && cal <= TAC_GE)
 #define ID_IS_CONST(id) (id->id_type == ID_NUM || id->id_type == ID_STRING)
-#define ID_IS_GCONST(id_type, data_type)                                      \
-	(id_type == ID_STRING || id_type == ID_NUM && (data_type == DATA_FLOAT || \
-	                                               data_type == DATA_DOUBLE))
+#define ID_IS_GCONST(id_type, data_type)           \
+	(id_type == ID_FUNC || id_type == ID_STRING || \
+	 id_type == ID_NUM &&                          \
+	     (data_type == DATA_FLOAT || data_type == DATA_DOUBLE))
 #define TAC_TO_FUNC(cal)                \
 	(cal == TAC_PLUS       ? "__addsf3" \
 	 : cal == TAC_MINUS    ? "__subsf3" \
@@ -159,12 +158,13 @@
 	 : cal == TAC_GT       ? "__gtsf2"  \
 	 : cal == TAC_GE       ? "__gesf2"  \
 	                       : "")
-#define TYPE_CHECK(id1, id2)                                             \
-	((id1->variable_type->data_type == id2->variable_type->data_type) || \
-	 ((id1->variable_type->data_type == DATA_CHAR) &&                    \
-	  (id2->variable_type->data_type == DATA_INT)) ||                    \
-	 ((id1->variable_type->data_type == DATA_INT) &&                     \
-	  (id2->variable_type->data_type == DATA_CHAR)))
+#define TYPE_CHECK(id1, id2)                                              \
+	(((id1->variable_type->data_type == id2->variable_type->data_type) || \
+	  ((id1->variable_type->data_type == DATA_CHAR) &&                    \
+	   (id2->variable_type->data_type == DATA_INT)) ||                    \
+	  ((id1->variable_type->data_type == DATA_INT) &&                     \
+	   (id2->variable_type->data_type == DATA_CHAR))) &&                  \
+	 (id1->variable_type->pointer_type == id2->variable_type->pointer_type))
 
 #ifdef HJJ_DEBUG
 #define PRINT_3(string, var_1, var_2, var_3) printf(string, var_1, var_2, var_3)

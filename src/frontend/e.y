@@ -124,13 +124,13 @@ function : function_head statement_block { reset_table(OUT_LOCAL_TABLE); $$ = pr
 | error {}
 ;
 
-function_head : basic_type IDENTIFIER '(' parameter_list ')' { $$ = process_function_head($1,$2,$4); reset_table(INTO_LOCAL_TABLE); }
-| void_type IDENTIFIER '(' parameter_list ')' { $$ = process_function_head($1,$2,$4); reset_table(INTO_LOCAL_TABLE); }
+function_head : basic_type IDENTIFIER '(' parameter_list ')' { $$ = process_function_head($1,$2,$4); }
+| void_type IDENTIFIER '(' parameter_list ')' { $$ = process_function_head($1,$2,$4); }
 ;
 
-parameter_list : parameter_type IDENTIFIER { $$ = process_parameter_list_head($1,$2); }
+parameter_list : parameter_type IDENTIFIER { reset_table(INTO_LOCAL_TABLE); $$ = process_parameter_list_head($1,$2); }
 | parameter_list ',' parameter_type IDENTIFIER { $$ = process_parameter_list($1,$3,$4); }
-| { $$ = new_op(); }
+| { reset_table(INTO_LOCAL_TABLE); $$ = new_op(); }
 ;
 
 /**************************************/

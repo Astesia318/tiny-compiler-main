@@ -155,6 +155,7 @@ struct op *process_instance_member(char *instance_name, char *member_name) {
 
 	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member));
 	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_addr));
+	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_instance_addr));
 	cat_tac(instance_op, NEW_TAC_2(TAC_REFER, t_instance_addr, instance));
 	cat_tac(instance_op, NEW_TAC_3(TAC_PLUS, t_member_addr, t_instance_addr,
 	                               process_int(member->member_offset)->addr));
@@ -330,6 +331,7 @@ struct op *process_struct_definition(char *name,
 	new_struct->struct_info.definition_list = definition_block;
 	new_struct->struct_info.next_struct = struct_table;
 	new_struct->struct_info.struct_type = cur_struct_type++;
+	new_struct->struct_info.struct_offset = cur_member_offset;
 	struct_table = new_struct;
 	cur_member_offset = 0;
 
@@ -589,13 +591,12 @@ struct op *process_assign(struct op *leftval_op, struct op *exp) {
 	assign_stat->addr = exp_temp;
 
 	cat_op(assign_stat, exp);
-	if ((TYPE_CHECK(leftval, exp_temp)) == 0) {
-		if (POINTER_TO_CONTENT(leftval->variable_type, exp_temp->variable_type) &&
-		    REF_TO_CONTENT(leftval->variable_type, exp_temp->variable_type)) {
-			struct op *cast_exp = type_casting(leftval, exp_temp);
-			exp_temp = cast_exp->addr;
-			cat_op(assign_stat, cast_exp);
-		}
+	if (!TYPE_CHECK(leftval, exp_temp) &&
+	    !REF_TO_CONTENT(leftval->variable_type, exp_temp->variable_type) &&
+	    !CONTENT_TO_REF(leftval->variable_type, exp_temp->variable_type)) {
+		struct op *cast_exp = type_casting(leftval, exp_temp);
+		exp_temp = cast_exp->addr;
+		cat_op(assign_stat, cast_exp);
 	}
 	cat_op(assign_stat, leftval_op);
 	if (leftval->variable_type->pointer_type == REF_VAR) {
@@ -677,10 +678,10 @@ struct op *process_reference(struct op *id_op) {
 
 	cat_op(pointer_stat, id_op);
 	cat_tac(pointer_stat, NEW_TAC_1(TAC_VAR, t));
-	if (var->variable_type->pointer_type != REF_VAR) {
-		cat_tac(pointer_stat, NEW_TAC_2(TAC_REFER, t, var));
-	} else {
+	if (var->variable_type->pointer_type == REF_VAR) {
 		cat_tac(pointer_stat, NEW_TAC_2(TAC_ASSIGN, t, var));
+	} else {
+		cat_tac(pointer_stat, NEW_TAC_2(TAC_REFER, t, var));
 	}
 
 	return pointer_stat;
