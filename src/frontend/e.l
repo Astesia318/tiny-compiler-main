@@ -45,6 +45,7 @@ MULTI_COMMENT				"/*"([^\*]|(\*)*[^\*/])*(\*)*"*/"
 "else"  					{ return ELSE; }
 "while"  					{ return WHILE; }
 "for"  						{ return FOR; }
+"->"  						{ return PSTRUCT_ACCESS; }
 
 \[{INT_CONST}\]  			{ 
 								BUF_ALLOC(buf);

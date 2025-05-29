@@ -29,9 +29,10 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 	cat_op(exp, exp_l);  // 拼接exp和exp_l的code
 	cat_op(exp, exp_r);  // 拼接exp和exp_r的code
 
-	if (exp_l_addr->variable_type->pointer_type == REF_VAR) {
-		struct id *tl = new_temp(
-		    new_var_type(exp_l_addr->variable_type->data_type, NOT_PTR));
+	if (exp_l_addr->variable_type->is_reference) {
+		struct id *tl =
+		    new_temp(new_var_type(exp_l_addr->variable_type->data_type,
+		                          exp_l_addr->variable_type->pointer_level, 0));
 
 		cat_tac(exp, NEW_TAC_1(TAC_VAR, tl));
 		cat_tac(exp, NEW_TAC_2(TAC_DEREFER_GET, tl, exp_l_addr));
@@ -39,9 +40,10 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 		exp_l_addr = tl;
 		t->variable_type->data_type = tl->variable_type->data_type;
 	}
-	if (exp_r_addr->variable_type->data_type == REF_VAR) {
-		struct id *tr = new_temp(
-		    new_var_type(exp_r_addr->variable_type->data_type, NOT_PTR));
+	if (exp_r_addr->variable_type->is_reference) {
+		struct id *tr =
+		    new_temp(new_var_type(exp_r_addr->variable_type->data_type,
+		                          exp_r_addr->variable_type->pointer_level, 0));
 
 		cat_tac(exp, NEW_TAC_1(TAC_VAR, tr));
 		cat_tac(exp, NEW_TAC_2(TAC_DEREFER_GET, tr, exp_r_addr));
@@ -76,10 +78,10 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 			struct id *label_2 = new_label();
 
 			struct id *const_0 = add_const_identifier(
-			    "0", ID_NUM, new_var_type(DATA_INT, NOT_PTR));
+			    "0", ID_NUM, new_const_type(DATA_INT, NOT_PTR));
 			const_0->number_info.num.num_int = 0;
 			struct id *const_1 = add_const_identifier(
-			    "1.0", ID_NUM, new_var_type(DATA_FLOAT, NOT_PTR));
+			    "1.0", ID_NUM, new_const_type(DATA_FLOAT, NOT_PTR));
 			const_1->number_info.num.num_float = 1.0;
 
 			cat_tac(exp, NEW_TAC_2(TAC_IFZ, t, label_1));
@@ -104,7 +106,7 @@ struct op *process_array_identifier(struct op *array_op, int index) {
 	struct op *id_op = new_op();
 
 	struct id *array = array_op->addr;
-	if (array->variable_type->pointer_type != PTR_VAR) {
+	if (!array->variable_type->pointer_level) {
 		perror("id is not from an array");
 #ifndef HJJ_DEBUG
 		exit(0);
@@ -146,11 +148,14 @@ struct op *process_instance_member(char *instance_name, char *member_name) {
 	struct id *instance = find_identifier(instance_name);
 	struct member_def *member = find_member(instance, member_name);
 	struct id *t_member =
-	    new_temp(new_var_type(member->variable_type->data_type, REF_VAR));
+	    new_temp(new_var_type(member->variable_type->data_type,
+	                          member->variable_type->pointer_level, 1));
 	struct id *t_member_addr =
-	    new_temp(new_var_type(member->variable_type->data_type, PTR_VAR));
+	    new_temp(new_var_type(member->variable_type->data_type,
+	                          member->variable_type->pointer_level + 1, 0));
 	struct id *t_instance_addr =
-	    new_temp(new_var_type(instance->variable_type->data_type, PTR_VAR));
+	    new_temp(new_var_type(instance->variable_type->data_type,
+	                          member->variable_type->pointer_level + 1, 0));
 	instance_op->addr = t_member;
 
 	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member));
@@ -158,6 +163,30 @@ struct op *process_instance_member(char *instance_name, char *member_name) {
 	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_instance_addr));
 	cat_tac(instance_op, NEW_TAC_2(TAC_REFER, t_instance_addr, instance));
 	cat_tac(instance_op, NEW_TAC_3(TAC_PLUS, t_member_addr, t_instance_addr,
+	                               process_int(member->member_offset)->addr));
+	cat_tac(instance_op,
+	        NEW_TAC_2(TAC_VAR_REFER_INIT, t_member, t_member_addr));
+
+	return instance_op;
+}
+
+struct op *process_pointer_instance_member(char *instance_ptr_name,
+                                           char *member_name) {
+	struct op *instance_op = new_op();
+
+	struct id *instance_ptr = find_identifier(instance_ptr_name);
+	struct member_def *member = find_member(instance_ptr, member_name);
+	struct id *t_member =
+	    new_temp(new_var_type(member->variable_type->data_type,
+	                          member->variable_type->pointer_level, 1));
+	struct id *t_member_addr =
+	    new_temp(new_var_type(member->variable_type->data_type,
+	                          member->variable_type->pointer_level + 1, 0));
+	instance_op->addr = t_member;
+
+	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member));
+	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_addr));
+	cat_tac(instance_op, NEW_TAC_3(TAC_PLUS, t_member_addr, instance_ptr,
 	                               process_int(member->member_offset)->addr));
 	cat_tac(instance_op,
 	        NEW_TAC_2(TAC_VAR_REFER_INIT, t_member, t_member_addr));
@@ -173,7 +202,7 @@ struct op *process_int(int integer) {
 	sprintf(buf, "%d", integer);
 	struct id *var = add_const_identifier(
 	    buf, ID_NUM,
-	    new_var_type(DATA_INT, NOT_PTR));  // 向符号表添加以buf为名的符号
+	    new_const_type(DATA_INT, NOT_PTR));  // 向符号表添加以buf为名的符号
 	var->number_info.num.num_int = integer;
 	int_op->addr = var;
 
@@ -187,7 +216,7 @@ struct op *process_float(double floatnum) {
 	BUF_ALLOC(buf);
 	sprintf(buf, "%f", floatnum);
 	struct id *var =
-	    add_const_identifier(buf, ID_NUM, new_var_type(DATA_FLOAT, NOT_PTR));
+	    add_const_identifier(buf, ID_NUM, new_const_type(DATA_FLOAT, NOT_PTR));
 	var->number_info.num.num_float = floatnum;
 	float_op->addr = var;
 
@@ -201,7 +230,7 @@ struct op *process_char(char character) {
 	BUF_ALLOC(buf);
 	sprintf(buf, "%c", character);
 	struct id *var =
-	    add_const_identifier(buf, ID_NUM, new_var_type(DATA_CHAR, NOT_PTR));
+	    add_const_identifier(buf, ID_NUM, new_const_type(DATA_CHAR, NOT_PTR));
 	var->number_info.num.num_char = character;
 	char_op->addr = var;
 
@@ -313,9 +342,10 @@ struct op *process_expression_list(struct op *arg_list_pre,
 	return exp_list;
 }
 
-struct var_type *process_struct_type(char *name, int pointer_type) {
+struct var_type *process_struct_type(char *name, int pointer_level,
+                                     int is_reference) {
 	return new_var_type(check_struct_name(name)->struct_info.struct_type,
-	                    pointer_type);
+	                    pointer_level, is_reference);
 }
 
 /**************************************/
@@ -360,7 +390,7 @@ struct op *process_declaration(struct var_type *variable_type,
 	    cur_declaration) {  // 逐个修改包含已声明变量的declaration_exp表达式所含变量的类型
 		cur_declaration->id_1->variable_type = variable_type;
 		if (cur_declaration->id_1->pointer_info.index != NO_INDEX) {
-			cur_declaration->id_1->variable_type->pointer_type = PTR_VAR;
+			cur_declaration->id_1->variable_type->pointer_level = 1;
 		}
 		cur_declaration = cur_declaration->next;
 	}
@@ -563,7 +593,7 @@ struct op *process_output_text(char *string) {
 	struct op *output_stat = new_op();
 
 	struct id *str = add_const_identifier(
-	    string, ID_STRING, new_var_type(DATA_UNDEFINED, NOT_PTR));
+	    string, ID_STRING, new_const_type(DATA_UNDEFINED, NOT_PTR));
 
 	cat_tac(output_stat, NEW_TAC_1(TAC_OUTPUT, str));
 
@@ -587,7 +617,6 @@ struct op *process_assign(struct op *leftval_op, struct op *exp) {
 
 	struct id *leftval = leftval_op->addr;
 	struct id *exp_temp = exp->addr;
-	struct id *t;  // used in ref
 	assign_stat->addr = exp_temp;
 
 	cat_op(assign_stat, exp);
@@ -597,11 +626,12 @@ struct op *process_assign(struct op *leftval_op, struct op *exp) {
 		struct op *cast_exp = type_casting(leftval, exp_temp);
 		exp_temp = cast_exp->addr;
 		cat_op(assign_stat, cast_exp);
+		printf("going to cst!\n");
 	}
 	cat_op(assign_stat, leftval_op);
-	if (leftval->variable_type->pointer_type == REF_VAR) {
+	if (leftval->variable_type->is_reference) {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, leftval, exp_temp));
-	} else if (exp_temp->variable_type->pointer_type == REF_VAR) {
+	} else if (exp_temp->variable_type->is_reference) {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_GET, leftval, exp_temp));
 	} else if (leftval->pointer_info.temp_derefer_put) {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, leftval, exp_temp));
@@ -617,7 +647,7 @@ struct op *process_derefer_put(struct op *id_op) {
 	struct op *content_stat = new_op();
 
 	struct id *var = id_op->addr;
-	if (var->variable_type->pointer_type != PTR_VAR) {
+	if (!var->variable_type->pointer_level) {
 		perror("data is not a pointer");
 		printf("data name: %s\n", var->name);
 		printf("data type: %d\n", var->variable_type->data_type);
@@ -642,7 +672,7 @@ struct op *process_derefer_get(struct op *id_op) {
 	struct op *content_stat = new_op();
 
 	struct id *var = id_op->addr;
-	if (var->variable_type->pointer_type != PTR_VAR) {
+	if (!var->variable_type->pointer_level) {
 		perror("data is not a pointer");
 #ifndef HJJ_DEBUG
 		exit(0);
@@ -650,7 +680,8 @@ struct op *process_derefer_get(struct op *id_op) {
 	}
 
 	struct id *t =
-	    new_temp(new_var_type(var->variable_type->data_type, NOT_PTR));
+	    new_temp(new_var_type(var->variable_type->data_type,
+	                          var->variable_type->pointer_level - 1, 0));
 	content_stat->addr = t;
 
 	cat_op(content_stat, id_op);
@@ -665,20 +696,21 @@ struct op *process_reference(struct op *id_op) {
 	struct op *pointer_stat = new_op();
 
 	struct id *var = id_op->addr;
-	if (var->variable_type->pointer_type == PTR_VAR) {
-		perror("data is a pointer");
-#ifndef HJJ_DEBUG
-		exit(0);
-#endif
-	}
+	// 	if (var->variable_type->pointer_level) {
+	// 		perror("data is a pointer");
+	// #ifndef HJJ_DEBUG
+	// 		exit(0);
+	// #endif
+	// 	}
 
 	struct id *t =
-	    new_temp(new_var_type(var->variable_type->data_type, PTR_VAR));
+	    new_temp(new_var_type(var->variable_type->data_type,
+	                          var->variable_type->pointer_level + 1, 0));
 	pointer_stat->addr = t;
 
 	cat_op(pointer_stat, id_op);
 	cat_tac(pointer_stat, NEW_TAC_1(TAC_VAR, t));
-	if (var->variable_type->pointer_type == REF_VAR) {
+	if (var->variable_type->is_reference) {
 		cat_tac(pointer_stat, NEW_TAC_2(TAC_ASSIGN, t, var));
 	} else {
 		cat_tac(pointer_stat, NEW_TAC_2(TAC_REFER, t, var));
@@ -772,9 +804,9 @@ struct op *param_args_type_casting(struct tac *func_param,
 
 	while (arg && param->type == TAC_PARAM) {
 		// 检查参数类型是否匹配
-		if (TYPE_CHECK(param->id_1, arg->id_1) == 0 &&
-		    REF_TO_CONTENT(param->id_1->variable_type,
-		                   arg->id_1->variable_type)) {
+		if (!TYPE_CHECK(param->id_1, arg->id_1) &&
+		    !REF_TO_CONTENT(param->id_1->variable_type,
+		                    arg->id_1->variable_type)) {
 			// 如果类型不匹配，进行类型转换
 			struct op *cast_exp = type_casting(param->id_1, arg->id_1);
 
@@ -786,7 +818,8 @@ struct op *param_args_type_casting(struct tac *func_param,
 		else if (REF_TO_CONTENT(param->id_1->variable_type,
 		                        arg->id_1->variable_type)) {
 			struct id *t = new_temp(
-			    new_var_type(arg->id_1->variable_type->data_type, PTR_VAR));
+			    new_var_type(arg->id_1->variable_type->data_type,
+			                 arg->id_1->variable_type->pointer_level + 1, 0));
 
 			cat_tac(cast_args, NEW_TAC_1(TAC_VAR, t));
 			cat_tac(cast_args, NEW_TAC_2(TAC_REFER, t, arg->id_1));
@@ -814,8 +847,9 @@ struct op *type_casting(struct id *id_remain, struct id *id_casting) {
 	int type_target = id_remain->variable_type->data_type;
 	int type_src = id_casting->variable_type->data_type;
 
-	struct id *t = new_temp(new_var_type(
-	    type_target, id_remain->variable_type->pointer_type));  // 分配临时变量
+	struct id *t = new_temp(
+	    new_var_type(type_target, id_remain->variable_type->pointer_level,
+	                 id_remain->variable_type->is_reference));  // 分配临时变量
 	cast_exp->addr = t;
 
 	char *casting_func = (char *)malloc(16);
