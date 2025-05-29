@@ -38,10 +38,10 @@
 #define IS_NOT_ASSIGN 0
 #define IS_ASSIGN 1
 // 符号类型
-#define NO_TYPE -1   // 无类型
-#define ID_VAR 0     // 变量
-#define ID_FUNC 1    // 函数
-#define ID_TEMP 2    // 临时变量
+#define NO_TYPE -1  // 无类型
+#define ID_VAR 0    // 变量
+#define ID_FUNC 1   // 函数
+// #define ID_TEMP 2    // 临时变量
 #define ID_NUM 3     // 数字常量
 #define ID_LABEL 4   // 标签
 #define ID_STRING 5  // 字符串
@@ -170,17 +170,43 @@
 #endif
 
 // 符号
-struct id {
-	const char *name;
+struct ptr_info {
+	int index;
+	int temp_derefer_put;
+};
+
+struct func_info {
+	struct tac *param_list;  // ID_func的参数列表，为了实现类型转换
+};
+
+struct num_info {
 	union {
 		int num_int;
 		float
 		    num_float;  // XXX:默认只实现float了先，process_float中也默认传入DATA_FLOAT了,asm_lc中的取址逻辑也要因此修改
 		char num_char;
 	} num;
+};
+
+struct member_def {
+	const char *name;
+	int data_type;
+
+	struct ptr_info pointer_info;
+
+	struct member_def *next_def;
+};
+
+struct strc_info {
+	struct member_def *definition_list;
+	struct id *next_struct;
+};
+
+struct id {
+	const char *name;
 
 	int id_type;
-	int data_type;  // control the type of 'num'
+	int data_type;
 
 	int scope;
 	int offset;
@@ -188,14 +214,10 @@ struct id {
 
 	struct id *next;
 
-	// used in pointer deref
-	int temp_derefer_put;
-	// int temp_derefer_get;
-
-	struct tac *func_param;  // ID_func的参数列表，为了实现类型转换
-
-	int index;       // 数组
-	int is_pointer;  // 指针
+	struct ptr_info pointer_info;
+	struct num_info number_info;
+	struct func_info function_info;
+	struct strc_info struct_info;
 };
 
 // 三地址码
@@ -229,14 +251,16 @@ extern struct tac *tac_head;
 extern struct tac *tac_tail;
 extern FILE *source_file, *tac_file, *obj_file;
 extern struct id *id_global, *id_local;
+extern struct id *struct_table;
 
 // 符号表
 void reset_table(int direction);
 // void clear_table(int scope);
 struct id *find_identifier(const char *name);
 struct id *find_func(const char *name);
+struct member_def *add_member_def(char *name, int data_type, int index);
 struct id *add_identifier(const char *name, int id_type, int data_type,
-                          int index, int is_pointer);
+                          int index);
 struct id *add_const_identifier(const char *name, int id_type, int data_type);
 
 // 三地址码表
@@ -245,6 +269,8 @@ void cat_tac(struct op *dest, struct tac *src);
 void cat_op(struct op *dest, struct op *src);             // 会释放src
 struct op *cat_list(struct op *exp_1, struct op *exp_2);  // 会释放exp_2
 struct op *cpy_op(struct op *src);
+struct member_def *cat_def(struct member_def *list_1,
+                           struct member_def *list_2);
 
 // 初始化
 struct op *new_op();
@@ -258,6 +284,7 @@ struct block *new_block(struct id *label_begin, struct id *label_end);
 const char *id_to_str(struct id *id);
 const char *data_to_str(int type);
 void output_tac(FILE *f, struct tac *code);
+void output_struct(FILE *f, struct id *id_struct);
 void source_to_tac(FILE *f, struct tac *code);
 void input_str(FILE *f, const char *format, ...);
 

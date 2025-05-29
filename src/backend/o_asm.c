@@ -18,7 +18,7 @@ void asm_bin(char *op, struct id *a, struct id *b, struct id *c) {
 	if (b->id_type == ID_NUM && c->id_type == ID_NUM) {
 		U_TYPE_UPPER_IMM(
 		    "li", reg_name[reg_a],
-		    OP_TO_CAL(op, b->num.num_int, c->num.num_int));  // li rd, imm
+		    OP_TO_CAL(op, b->number_info.num.num_int, c->number_info.num.num_int));  // li rd, imm
 	}
 	// bc其中一个不是立即数
 	else {
@@ -56,9 +56,9 @@ void asm_bin(char *op, struct id *a, struct id *b, struct id *c) {
 		else {
 			I_TYPE_ARITH("addi", reg_name[reg_a],
 			             reg_b != -1 ? reg_name[reg_b] : reg_name[reg_c],
-			             reg_b != -1 ? (op[0] == 's' ? -(c->num.num_int)
-			                                         : c->num.num_int)
-			                         : b->num.num_int);
+			             reg_b != -1 ? (op[0] == 's' ? -(c->number_info.num.num_int)
+			                                         : c->number_info.num.num_int)
+			                         : b->number_info.num.num_int);
 		}
 	}
 	// store a
@@ -72,7 +72,7 @@ void asm_cmp(int op, struct id *a, struct id *b, struct id *c) {
 	// bc都是立即数,直接计算
 	int res_reg = reg_alloc(a);
 	if (b->id_type == ID_NUM && c->id_type == ID_NUM) {
-		OP_TO_CMP(op, b->num.num_int, c->num.num_int)
+		OP_TO_CMP(op, b->number_info.num.num_int, c->number_info.num.num_int)
 		? U_TYPE_UPPER_IMM("li", reg_name[res_reg], 1) :  // li rd,1
 		    (res_reg = R_zero);
 	}
@@ -116,7 +116,7 @@ void asm_cmp(int op, struct id *a, struct id *b, struct id *c) {
 					break;
 			}
 		} else {
-			int imm_c = reg_b == -1 ? b->num.num_int : c->num.num_int;
+			int imm_c = reg_b == -1 ? b->number_info.num.num_int : c->number_info.num.num_int;
 			int reg_temp = reg_b == -1 ? reg_c : reg_b;
 			const char *temp_n = reg_name[reg_temp];
 
@@ -298,12 +298,12 @@ void asm_gvar(struct id *a) {
 	input_str(obj_file, "	.type	%s,@object\n", a->name);
 	input_str(obj_file, "	.size %s, %d\n", a->name, data_size);
 	input_str(obj_file, "%s:\n", a->name);
-	if (a->index == NO_INDEX) {
+	if (a->pointer_info.index == NO_INDEX) {
 		input_str(obj_file, "	.zero	%d",
 		          data_size);  // XXX:需要实现全局变量赋值后作改动
 	} else {
 		input_str(obj_file, "	.zero	%d",
-		          a->index * data_size);  // XXX:需要实现全局变量赋值后作改动
+		          a->pointer_info.index * data_size);  // XXX:需要实现全局变量赋值后作改动
 	}
 }
 // 生成函数返回对应的汇编代码

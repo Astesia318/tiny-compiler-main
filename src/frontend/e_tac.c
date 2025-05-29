@@ -7,6 +7,7 @@
 int scope;
 char temp_buf[256];
 struct id *id_global, *id_local;
+struct id *struct_table;
 static int temp_amount;
 static int label_amount;
 static int lc_amount;
@@ -58,8 +59,7 @@ static struct id *_collide_identifier(const char *name, int id_type,
 }
 
 static struct id *_add_identifier(const char *name, int id_type, int data_type,
-                                  struct id **id_table, int index,
-                                  int is_pointer) {
+                                  struct id **id_table, int index) {
 	struct id *id_wanted;
 
 	struct id *id_collision = _collide_identifier(name, id_type, data_type);
@@ -82,8 +82,7 @@ static struct id *_add_identifier(const char *name, int id_type, int data_type,
 	id_wanted->name = id_name;
 	id_wanted->id_type = id_type;
 	id_wanted->data_type = data_type;
-	id_wanted->index = index;
-	id_wanted->is_pointer = is_pointer;
+	id_wanted->pointer_info.index = index;
 	id_wanted->next = *id_table;
 	*id_table = id_wanted;
 	id_wanted->offset = -1; /* Unset address */
@@ -111,19 +110,31 @@ struct id *find_func(const char *name) {
 }
 
 struct id *add_identifier(const char *name, int id_type, int data_type,
-                          int index, int is_pointer) {
+                          int index) {
 	// lyc:对于text float double类型常量将其放到全局表里
 	if (ID_IS_GCONST(id_type, data_type))
 		return _add_identifier(name, id_type, data_type,
-		                       _choose_id_table(GLOBAL_TABLE), index,
-		                       is_pointer);
+		                       _choose_id_table(GLOBAL_TABLE), index);
 	else
 		return _add_identifier(name, id_type, data_type,
-		                       _choose_id_table(scope), index, is_pointer);
+		                       _choose_id_table(scope), index);
 }
 
 struct id *add_const_identifier(const char *name, int id_type, int data_type) {
-	return add_identifier(name, id_type, data_type, NO_INDEX, NOT_POINTER);
+	return add_identifier(name, id_type, data_type, NO_INDEX);
+}
+
+struct member_def *add_member_def(char *name, int data_type, int index) {
+	struct member_def *new_def;
+
+	MALLOC_AND_SET_ZERO(new_def, 1, struct member_def);
+	char *member_name = (char *)malloc(sizeof(char) * strlen(name));
+	strcpy(member_name, name);
+	new_def->name = member_name;
+	new_def->data_type = data_type;
+	new_def->pointer_info.index = index;
+
+	return new_def;
 }
 
 void init_tac() {
@@ -186,6 +197,16 @@ struct op *cat_list(struct op *exp_1, struct op *exp_2) {
 // 目前来看，并不需要复制再释放的操作，只需要把指针本身复制给dest
 struct op *cpy_op(struct op *src) { return src; }
 
+struct member_def *cat_def(struct member_def *list_1,
+                           struct member_def *list_2) {
+	struct member_def *cur_def = list_1;
+	while (cur_def->next_def) {
+		cur_def = cur_def->next_def;
+	}
+	cur_def->next_def = list_2;
+	return list_1;
+}
+
 struct op *new_op() {
 	struct op *nop;
 	MALLOC_AND_SET_ZERO(nop, 1, struct op);
@@ -208,9 +229,9 @@ struct tac *new_tac(int type, struct id *id_1, struct id *id_2,
 
 struct id *new_temp(int data_type) {
 	NAME_ALLOC(buf);
-	sprintf(buf, "t%d", temp_amount++);
-	return add_identifier(buf, ID_TEMP, data_type, NO_INDEX,
-	                      DATA_IS_POINTER(data_type));
+	sprintf(buf, "t%d", temp_amount++);  // hjj: todo, check collision
+	// return add_identifier(buf, ID_TEMP, data_type, NO_INDEX,
+	return add_identifier(buf, ID_VAR, data_type, NO_INDEX);
 }
 
 struct id *new_label() {
@@ -240,7 +261,7 @@ const char *id_to_str(struct id *id) {
 			}
 		case ID_VAR:
 		case ID_FUNC:
-		case ID_TEMP:
+		// case ID_TEMP:
 		case ID_LABEL:
 		case ID_STRING:
 			return id->name;
@@ -248,6 +269,22 @@ const char *id_to_str(struct id *id) {
 		default:
 			perror("unknown TAC arg type");
 			return "?";
+	}
+}
+
+void output_struct(FILE *f, struct id *id_struct) {
+	PRINT_1("struct %s\n", id_struct->name);
+	struct member_def *cur_definition = id_struct->struct_info.definition_list;
+	while (cur_definition) {
+		if (cur_definition->pointer_info.index == NO_INDEX) {
+			PRINT_2("member %s %s\n", data_to_str(cur_definition->data_type),
+			        cur_definition->name);
+		} else {
+			PRINT_3("member %s %s[%d]\n",
+			        data_to_str(POINTER_TO_CONTENT(cur_definition->data_type)),
+			        cur_definition->name, cur_definition->pointer_info.index);
+		}
+		cur_definition = cur_definition->next_def;
 	}
 }
 
@@ -409,13 +446,13 @@ void output_tac(FILE *f, struct tac *code) {
 			break;
 
 		case TAC_VAR:
-			if (code->id_1->index == NO_INDEX) {
+			if (code->id_1->pointer_info.index == NO_INDEX) {
 				PRINT_2("var %s %s\n", data_to_str(code->id_1->data_type),
 				        id_to_str(code->id_1));
 			} else {
 				PRINT_3("var %s %s[%d]\n",
 				        data_to_str(POINTER_TO_CONTENT(code->id_1->data_type)),
-				        id_to_str(code->id_1), code->id_1->index);
+				        id_to_str(code->id_1), code->id_1->pointer_info.index);
 			}
 			break;
 
@@ -439,6 +476,11 @@ void output_tac(FILE *f, struct tac *code) {
 }
 
 void source_to_tac(FILE *f, struct tac *code) {
+	struct id *cur_struct = struct_table;
+	while (cur_struct) {
+		output_struct(f, cur_struct);
+		cur_struct = cur_struct->struct_info.next_struct;
+	}
 	while (code) {
 		output_tac(f, code);
 		code = code->next;

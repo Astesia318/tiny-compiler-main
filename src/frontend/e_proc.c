@@ -74,10 +74,10 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 			struct id *label_2 = new_label();
 
 			struct id *const_0 = add_const_identifier("0", ID_NUM, DATA_INT);
-			const_0->num.num_int = 0;
+			const_0->number_info.num.num_int = 0;
 			struct id *const_1 =
 			    add_const_identifier("1.0", ID_NUM, DATA_FLOAT);
-			const_1->num.num_float = 1.0;
+			const_1->number_info.num.num_float = 1.0;
 
 			cat_tac(exp, NEW_TAC_2(TAC_IFZ, t, label_1));
 			cat_tac(exp, NEW_TAC_2(TAC_ASSIGN, t, const_1));
@@ -120,7 +120,7 @@ struct op *process_array_identifier(struct op *array_op, int index) {
 struct op *process_add_identifier(char *name, int index) {
 	struct op *id_op = new_op();
 
-	struct id *var = add_identifier(name, ID_VAR, NO_TYPE, index, NOT_POINTER);
+	struct id *var = add_identifier(name, ID_VAR, NO_TYPE, index);
 
 	cat_tac(id_op, NEW_TAC_1(TAC_VAR, var));
 
@@ -145,7 +145,7 @@ struct op *process_int(int integer) {
 	sprintf(buf, "%d", integer);
 	struct id *var = add_const_identifier(
 	    buf, ID_NUM, DATA_INT);  // 向符号表添加以buf为名的符号
-	var->num.num_int = integer;
+	var->number_info.num.num_int = integer;
 	int_exp->addr = var;
 
 	return int_exp;
@@ -158,7 +158,7 @@ struct op *process_float(double floatnum) {
 	BUF_ALLOC(buf);
 	sprintf(buf, "%f", floatnum);
 	struct id *var = add_const_identifier(buf, ID_NUM, DATA_FLOAT);
-	var->num.num_float = floatnum;
+	var->number_info.num.num_float = floatnum;
 	float_exp->addr = var;
 
 	return float_exp;
@@ -171,7 +171,7 @@ struct op *process_char(char character) {
 	BUF_ALLOC(buf);
 	sprintf(buf, "%c", character);
 	struct id *var = add_const_identifier(buf, ID_NUM, DATA_CHAR);
-	var->num.num_char = character;
+	var->number_info.num.num_char = character;
 	char_exp->addr = var;
 
 	return char_exp;
@@ -283,38 +283,47 @@ struct op *process_expression_list(struct op *arg_list_pre,
 /**************************************/
 /************* statement **************/
 /**************************************/
-struct op *process_struct_definition(char *name, struct op *definition_block){
-	struct op *id_op = new_op();
+// 可以考虑用注释形式放到三地址文件？
+struct op *process_member_definition(char *name,
+                                     struct member_def *definition_block) {
+	struct op *struct_op = new_op();
 
-	struct id *var = add_identifier(name, ID_STRUCT, NO_TYPE, NO_INDEX, NOT_POINTER);
+	struct id *new_struct = add_identifier(name, ID_STRUCT, NO_TYPE, NO_INDEX);
+	new_struct->struct_info.definition_list = definition_block;
+	new_struct->struct_info.next_struct = struct_table;
+	struct_table = new_struct;
 
-	return id_op;
+	return struct_op;
 }
 
-struct op *process_definition(int data_type, struct op *definition_list){
-	
-	return 0;
+struct member_def *process_definition(int data_type,
+                                      struct member_def *definition_list) {
+	struct member_def *cur_definition = definition_list;
+	while (cur_definition) {
+		cur_definition->data_type = data_type;
+		cur_definition = cur_definition->next_def;
+	}
+	return definition_list;
 }
 
-struct op *process_add_member(char *name, int index){
-	
-	return 0;
+struct member_def *process_add_member(char *name, int index) {
+	return add_member_def(name, NO_DATA, index);
 }
 
 // 处理变量声明，为process_variable函数声明的变量加上类型
 struct op *process_declaration(int data_type, struct op *declaration_exp) {
 	struct op *declaration = new_op();
 
-	struct tac *head = declaration_exp->code;
+	struct tac *cur_declaration = declaration_exp->code;
 	while (
-	    head) {  // 逐个修改包含已声明变量的declaration_exp表达式所含变量的类型
-		if (head->id_1->index == NO_INDEX &&
-		    head->id_1->is_pointer == NOT_POINTER) {
-			head->id_1->data_type = data_type;
+	    cur_declaration) {  // 逐个修改包含已声明变量的declaration_exp表达式所含变量的类型
+		if (cur_declaration->id_1->pointer_info.index == NO_INDEX) {  //&&
+			// head->id_1->is_pointer == NOT_POINTER) {
+			cur_declaration->id_1->data_type = data_type;
 		} else {
-			head->id_1->data_type = CONTENT_TO_POINTER(data_type);
+			cur_declaration->id_1->data_type = CONTENT_TO_POINTER(data_type);
 		}
-		head = head->next;
+		cur_declaration = cur_declaration->next;
 	}
 	cat_op(declaration, declaration_exp);
 
@@ -474,7 +483,7 @@ struct op *process_call(char *name, struct op *arg_list) {
 
 	struct tac *arg = arg_list->code;
 	struct op *cast_arg_list =
-	    param_args_type_casting(func->func_param, arg_list);
+	    param_args_type_casting(func->function_info.param_list, arg_list);
 
 	if (func->data_type != DATA_VOID) {
 		cat_tac(call_stat, NEW_TAC_1(TAC_VAR, t));
@@ -542,17 +551,18 @@ struct op *process_assign(struct op *leftval, struct op *exp) {
 	assign_stat->addr = exp_temp;
 
 	cat_op(assign_stat, exp);
-	if ((TYPE_CHECK(var, exp_temp)) == 0 &&
-	    POINTER_TO_CONTENT(var->data_type) != exp_temp->data_type &&
-	    REF_TO_CONTENT(var->data_type) != exp_temp->data_type) {
-		struct op *cast_exp = type_casting(var, exp_temp);
-		exp_temp = cast_exp->addr;
-		cat_op(assign_stat, cast_exp);
+	if ((TYPE_CHECK(var, exp_temp)) == 0) {
+		if (POINTER_TO_CONTENT(var->data_type) != exp_temp->data_type &&
+		    REF_TO_CONTENT(var->data_type) != exp_temp->data_type) {
+			struct op *cast_exp = type_casting(var, exp_temp);
+			exp_temp = cast_exp->addr;
+			cat_op(assign_stat, cast_exp);
+		}
 	}
 	cat_op(assign_stat, leftval);
 	if (DATA_IS_REF(var->data_type)) {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, var, exp_temp));
-	} else if (var->temp_derefer_put) {
+	} else if (var->pointer_info.temp_derefer_put) {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, var, exp_temp));
 	} else {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, var, exp_temp));
@@ -576,7 +586,7 @@ struct op *process_derefer_put(struct op *id_op) {
 	}
 
 	struct id *t = new_temp(var->data_type);
-	t->temp_derefer_put = 1;
+	t->pointer_info.temp_derefer_put = 1;
 	content_stat->addr = t;
 
 	cat_op(content_stat, id_op);
@@ -668,7 +678,7 @@ struct op *process_function_head(int data_type, char *name,
 	cat_tac(function_head, NEW_TAC_0(TAC_BEGIN));
 	cat_op(function_head, parameter_list);
 
-	function_head->code->id_1->func_param = parameter_list->code;
+	function_head->code->id_1->function_info.param_list = parameter_list->code;
 
 	return function_head;
 }
@@ -677,8 +687,7 @@ struct op *process_function_head(int data_type, char *name,
 struct op *process_parameter_list_head(int data_type, char *name) {
 	struct op *parameter = new_op();
 
-	struct id *var = add_identifier(name, ID_VAR, data_type, NO_INDEX,
-	                                DATA_IS_POINTER(data_type));
+	struct id *var = add_identifier(name, ID_VAR, data_type, NO_INDEX);
 	cat_tac(parameter, NEW_TAC_1(TAC_PARAM, var));
 
 	return parameter;
@@ -689,8 +698,7 @@ struct op *process_parameter_list(struct op *param_list_pre, int data_type,
                                   char *name) {
 	struct op *parameter_list = new_op();
 
-	struct id *var = add_identifier(name, ID_VAR, data_type, NO_INDEX,
-	                                DATA_IS_POINTER(data_type));
+	struct id *var = add_identifier(name, ID_VAR, data_type, NO_INDEX);
 	cat_op(parameter_list, param_list_pre);
 	cat_tac(parameter_list, NEW_TAC_1(TAC_PARAM, var));
 

@@ -38,7 +38,7 @@ MULTI_COMMENT				"/*"([^\*]|(\*)*[^\*/])*(\*)*"*/"
 "int_ptr" 					{ return INT_PTR; }
 "long_ptr" 					{ return LONG_PTR; }
 "float_ptr" 				{ return FLOAT_PTR; }
-"long_ptr" 					{ return LONG_PTR; }
+"double_ptr" 				{ return DOUBLE_PTR; }
 "char_ptr" 					{ return CHAR_PTR; }
 "struct"  					{ return STRUCT; }
 "input"  					{ return INPUT; }
