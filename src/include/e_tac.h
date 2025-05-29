@@ -48,10 +48,10 @@
 
 // 变量类型
 #define NO_TYPE (void *)0  // 无类型
-#define UNDEFINED_PTR 0
-#define NOT_PTR 1
-#define PTR_VAR 2
-#define REF_VAR 3
+// #define UNDEFINED_PTR 0
+// #define NOT_PTR 1
+// #define PTR_VAR 2
+// #define REF_VAR 3
 
 // 数据类型
 #define PTR_OFFSET 10
@@ -135,9 +135,9 @@
 	pointer = (type *)malloc((amount) * sizeof(type)); \
 	memset(pointer, 0, (amount) * sizeof(type));
 
-#define NEW_BUILT_IN_FUNC_ID(identifier, func_name, data_type)             \
-	identifier = add_const_identifier(func_name, ID_FUNC,                  \
-	                                  new_const_type(data_type, NOT_PTR)); \
+#define NEW_BUILT_IN_FUNC_ID(identifier, func_name, data_type)       \
+	identifier = add_const_identifier(func_name, ID_FUNC,            \
+	                                  new_const_type(data_type, 0)); \
 	identifier->offset = -1;
 
 #define TAC_IS_CMP(cal) (cal >= TAC_EQ && cal <= TAC_GE)
