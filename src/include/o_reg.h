@@ -83,16 +83,16 @@ extern const char *args_name[];
                // hjj:DATA_UNDEFINED改成了DATA_UNDEFINED
 
 #define TYPE_SIZE(variable_type)                       \
-	((variable_type)->pointer_type == PTR_VAR   ? 4    \
-	 : (variable_type)->pointer_type == REF_VAR ? 4    \
+	((variable_type)->pointer_level     ? 4               \
+	 : (variable_type)->is_reference ? 4               \
 	 : (variable_type)->data_type >= DATA_STRUCT_INIT  \
 	     ? check_struct_type(variable_type->data_type) \
 	           ->struct_info.struct_offset             \
 	     : DATA_SIZE((variable_type)->data_type))
 
 #define TYPE_ALIGN(variable_type)                       \
-	((variable_type)->pointer_type == PTR_VAR       ? 2 \
-	 : (variable_type)->pointer_type == REF_VAR     ? 2 \
+	((variable_type)->pointer_level                    ? 2 \
+	 : (variable_type)->is_reference                ? 2 \
 	 : (variable_type)->data_type == DATA_UNDEFINED ? 2 \
 	 : (variable_type)->data_type == DATA_INT       ? 2 \
 	 : (variable_type)->data_type == DATA_LONG      ? 2 \

@@ -96,7 +96,7 @@ void yyerror(char* msg);
 %type <operation> existed_identifier
 
 %token EQ NE LT LE GT GE
-%token IF ELSE WHILE FOR BREAK CONTINUE INPUT OUTPUT RETURN STRUCT
+%token IF ELSE WHILE FOR BREAK CONTINUE INPUT OUTPUT RETURN STRUCT PSTRUCT_ACCESS
 
 %left INC DEC
 %left EQ NE LT LE GT GE
@@ -289,27 +289,28 @@ add_identifier : IDENTIFIER index_or_null { $$ = process_add_identifier($1,$2) }
 array_identifier : existed_identifier INDEX { $$ = process_array_identifier($1,$2); }
 
 existed_identifier : IDENTIFIER '.' IDENTIFIER { $$ = process_instance_member($1,$3); }
+| IDENTIFIER PSTRUCT_ACCESS IDENTIFIER { $$ = process_pointer_instance_member($1,$3); }
 | IDENTIFIER { $$ = process_identifier($1); }
 ;
 
-parameter_type : basic_type '&' { $$ = new_var_type($1->data_type,REF_VAR); }
+parameter_type : basic_type '&' { $$ = new_var_type($1->data_type,$1->pointer_level,1); }
 | basic_type { $$ = $1; }
 ;
 
-void_type : VOID { $$ = new_var_type(DATA_VOID,NOT_PTR); }
+void_type : VOID { $$ = new_var_type(DATA_VOID,0,0); }
 
-basic_type : INT { $$ = new_var_type(DATA_INT,NOT_PTR); }
-| LONG { $$ = new_var_type(DATA_LONG,NOT_PTR); }
-| FLOAT { $$ = new_var_type(DATA_FLOAT,NOT_PTR); }
-| DOUBLE { $$ = new_var_type(DATA_DOUBLE,NOT_PTR); }
-| CHAR { $$ = new_var_type(DATA_CHAR,NOT_PTR); }
-| INT '*' { $$ = new_var_type(DATA_INT,PTR_VAR); }
-| LONG '*' { $$ = new_var_type(DATA_LONG,PTR_VAR); }
-| FLOAT '*' { $$ = new_var_type(DATA_FLOAT,PTR_VAR); }
-| DOUBLE '*' { $$ = new_var_type(DATA_DOUBLE,PTR_VAR); }
-| CHAR '*' { $$ = new_var_type(DATA_CHAR,PTR_VAR); }
-| STRUCT IDENTIFIER { $$ = process_struct_type($2,NOT_PTR); }
-| STRUCT IDENTIFIER '*' { $$ = process_struct_type($2,PTR_VAR); }
+basic_type : INT { $$ = new_var_type(DATA_INT,0,0); }
+| LONG { $$ = new_var_type(DATA_LONG,0,0); }
+| FLOAT { $$ = new_var_type(DATA_FLOAT,0,0); }
+| DOUBLE { $$ = new_var_type(DATA_DOUBLE,0,0); }
+| CHAR { $$ = new_var_type(DATA_CHAR,0,0); }
+| INT '*' { $$ = new_var_type(DATA_INT,1,0); }
+| LONG '*' { $$ = new_var_type(DATA_LONG,1,0); }
+| FLOAT '*' { $$ = new_var_type(DATA_FLOAT,1,0); }
+| DOUBLE '*' { $$ = new_var_type(DATA_DOUBLE,1,0); }
+| CHAR '*' { $$ = new_var_type(DATA_CHAR,1,0); }
+| STRUCT IDENTIFIER { $$ = process_struct_type($2,0,0); }
+| STRUCT IDENTIFIER '*' { $$ = process_struct_type($2,1,0); }
 ;
 
 index_or_null : INDEX { $$ = $1; }

@@ -69,22 +69,22 @@
 // #define DATA_IS_REF(type) ((type >= DATA_RINT) && (type <= DATA_RCHAR))
 #define POINTER_TO_CONTENT(type_1, type_2)         \
 	((type_1)->data_type == (type_2)->data_type && \
-	 (type_1)->pointer_type == PTR_VAR && (type_2)->pointer_type == NOT_PTR)
+	 (type_1)->pointer_level == (type_2)->pointer_level + 1)
 #define CONTENT_TO_POINTER(type_1, type_2)         \
 	((type_1)->data_type == (type_2)->data_type && \
-	 (type_1)->pointer_type == NOT_PTR && (type_2)->pointer_type == PTR_VAR)
-#define REF_TO_CONTENT(type_1, type_2)             \
-	((type_1)->data_type == (type_2)->data_type && \
-	 (type_1)->pointer_type == REF_VAR && (type_2)->pointer_type == NOT_PTR)
-#define CONTENT_TO_REF(type_1, type_2)             \
-	((type_1)->data_type == (type_2)->data_type && \
-	 (type_1)->pointer_type == NOT_PTR && (type_2)->pointer_type == REF_VAR)
-#define REF_TO_POINTER(type_1, type_2)             \
-	((type_1)->data_type == (type_2)->data_type && \
-	 (type_1)->pointer_type == REF_VAR && (type_2)->pointer_type == NOT_PTR)
-#define POINTER_TO_REF(type_1, type_2)             \
-	((type_1)->data_type == (type_2)->data_type && \
-	 (type_1)->pointer_type == PTR_VAR && (type_2)->pointer_type == REF_VAR)
+	 (type_1)->pointer_level + 1 == (type_2)->pointer_level)
+#define REF_TO_CONTENT(type_1, type_2)                                       \
+	((type_1)->data_type == (type_2)->data_type && (type_1)->is_reference && \
+	 (type_1)->pointer_level == (type_2)->pointer_level)
+#define CONTENT_TO_REF(type_1, type_2)                                       \
+	((type_1)->data_type == (type_2)->data_type && (type_2)->is_reference && \
+	 (type_1)->pointer_level == (type_2)->pointer_level)
+#define REF_TO_POINTER(type_1, type_2)                                       \
+	((type_1)->data_type == (type_2)->data_type && (type_1)->is_reference && \
+	 (type_1)->pointer_level == (type_2)->pointer_level - 1)
+#define POINTER_TO_REF(type_1, type_2)                                       \
+	((type_1)->data_type == (type_2)->data_type && (type_2)->is_reference && \
+	 (type_1)->pointer_level - 1 == (type_2)->pointer_level)
 
 // 三地址码类型
 #define TAC_UNDEF -1           // 未定义
@@ -135,9 +135,9 @@
 	pointer = (type *)malloc((amount) * sizeof(type)); \
 	memset(pointer, 0, (amount) * sizeof(type));
 
-#define NEW_BUILT_IN_FUNC_ID(identifier, func_name, data_type)           \
-	identifier = add_const_identifier(func_name, ID_FUNC,                \
-	                                  new_var_type(data_type, NOT_PTR)); \
+#define NEW_BUILT_IN_FUNC_ID(identifier, func_name, data_type)             \
+	identifier = add_const_identifier(func_name, ID_FUNC,                  \
+	                                  new_const_type(data_type, NOT_PTR)); \
 	identifier->offset = -1;
 
 #define TAC_IS_CMP(cal) (cal >= TAC_EQ && cal <= TAC_GE)
@@ -164,7 +164,7 @@
 	   (id2->variable_type->data_type == DATA_INT)) ||                    \
 	  ((id1->variable_type->data_type == DATA_INT) &&                     \
 	   (id2->variable_type->data_type == DATA_CHAR))) &&                  \
-	 (id1->variable_type->pointer_type == id2->variable_type->pointer_type))
+	 (id1->variable_type->pointer_level == id2->variable_type->pointer_level))
 
 #ifdef HJJ_DEBUG
 #define PRINT_3(string, var_1, var_2, var_3) printf(string, var_1, var_2, var_3)
@@ -181,8 +181,9 @@
 
 // 符号
 struct var_type {
-	int pointer_type;
 	int data_type;
+	int pointer_level;
+	int is_reference;
 };
 
 struct ptr_info {
@@ -306,7 +307,9 @@ struct tac *new_tac(int type, struct id *id_1, struct id *id_2,
 struct id *new_temp(struct var_type *variable_type);
 struct id *new_label();
 struct block *new_block(struct id *label_begin, struct id *label_end);
-struct var_type *new_var_type(int data_type, int pointer_type);
+struct var_type *new_var_type(int data_type, int pointer_level,
+                              int is_reference);
+struct var_type *new_const_type(int data_type, int pointer_level);
 
 // 字符串处理
 const char *id_to_str(struct id *id);

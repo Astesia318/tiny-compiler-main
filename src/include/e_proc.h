@@ -17,7 +17,10 @@ struct op *process_add_identifier(char *name, int index);
 struct op *process_array_identifier(struct op *array_op, int index);
 struct op *process_identifier(char *name);
 struct op *process_instance_member(char *instance_name, char *member_name);
-struct var_type *process_struct_type(char *name, int pointer_type);
+struct op *process_pointer_instance_member(char *instance_ptr_name,
+                                           char *member_name);
+struct var_type *process_struct_type(char *name, int pointer_level,
+                                     int is_reference);
 
 struct op *process_struct_definition(char *name,
                                      struct member_def *definition_block);

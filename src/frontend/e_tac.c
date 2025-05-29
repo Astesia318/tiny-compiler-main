@@ -163,8 +163,8 @@ struct member_def *find_member(struct id *instance, char *member_name) {
 struct id *add_identifier(const char *name, int id_type,
                           struct var_type *variable_type, int index) {
 	// lyc:对于text float double类型常量将其放到全局表里
-	// hjj: so as function and struct...原因是类型转换时会添加func, 这个func应当到global table。
-	// hjj: 不过到层次结构可能会改变
+	// hjj: so as function and struct...原因是类型转换时会添加func,
+	// 这个func应当到global table。 hjj: 不过到层次结构可能会改变
 	if (ID_IS_GCONST(id_type, variable_type->data_type))
 		return _add_identifier(name, id_type, variable_type,
 		                       _choose_id_table(GLOBAL_TABLE), index);
@@ -292,7 +292,7 @@ struct id *new_label() {
 	NAME_ALLOC(label);
 	sprintf(label, ".L%d", label_amount++);
 	return add_const_identifier(label, ID_LABEL,
-	                            new_var_type(DATA_UNDEFINED, NOT_PTR));
+	                            new_const_type(DATA_UNDEFINED, NOT_PTR));
 }
 
 struct block *new_block(struct id *l_begin, struct id *l_end) {
@@ -303,12 +303,18 @@ struct block *new_block(struct id *l_begin, struct id *l_end) {
 	return nstack;
 }
 
-struct var_type *new_var_type(int data_type, int pointer_type) {
+struct var_type *new_var_type(int data_type, int pointer_level,
+                              int is_reference) {
 	struct var_type *new_type;
 	MALLOC_AND_SET_ZERO(new_type, 1, struct var_type);
 	new_type->data_type = data_type;
-	new_type->pointer_type = pointer_type;
+	new_type->pointer_level = pointer_level;
+	new_type->is_reference = is_reference;
 	return new_type;
+}
+
+struct var_type *new_const_type(int data_type, int pointer_level) {
+	return new_var_type(data_type, pointer_level, 0);
 }
 
 const char *id_to_str(struct id *id) {
@@ -353,7 +359,6 @@ void output_struct(FILE *f, struct id *id_struct) {
 
 const char *data_to_str(struct var_type *variable_type) {
 	int data_type = variable_type->data_type;
-	int pointer_type = variable_type->pointer_type;
 	char *buf = (char *)malloc(NAME_SIZE);
 
 	if (data_type == DATA_UNDEFINED) {
@@ -384,9 +389,12 @@ const char *data_to_str(struct var_type *variable_type) {
 				break;
 		}
 	}
-	if (pointer_type == PTR_VAR) {
-		strcat(buf, " *");
-	} else if (pointer_type == REF_VAR) {
+	int cur_pointer = 0;
+	while (cur_pointer != variable_type->pointer_level) {
+		strcat(buf, "*");
+		cur_pointer++;
+	}
+	if (variable_type->is_reference) {
 		strcat(buf, " &");
 	}
 	return buf;
