@@ -23,23 +23,25 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 	struct id *exp_l_addr = exp_l->addr;
 	struct id *exp_r_addr = exp_r->addr;
 
-	struct id *t = new_temp(exp_l->addr->data_type);  // 分配临时变量
+	struct id *t = new_temp(exp_l->addr->variable_type);  // 分配临时变量
 	exp->addr = t;
 	cat_tac(exp, NEW_TAC_1(TAC_VAR, t));
 	cat_op(exp, exp_l);  // 拼接exp和exp_l的code
 	cat_op(exp, exp_r);  // 拼接exp和exp_r的code
 
-	if (DATA_IS_REF(exp_l_addr->data_type)) {
-		struct id *tl = new_temp(REF_TO_CONTENT(exp_l_addr->data_type));
+	if (exp_l_addr->variable_type->pointer_type == REF_VAR) {
+		struct id *tl = new_temp(
+		    new_var_type(exp_l_addr->variable_type->data_type, NOT_PTR));
 
 		cat_tac(exp, NEW_TAC_1(TAC_VAR, tl));
 		cat_tac(exp, NEW_TAC_2(TAC_DEREFER_GET, tl, exp_l_addr));
 
 		exp_l_addr = tl;
-		t->data_type = tl->data_type;
+		t->variable_type->data_type = tl->variable_type->data_type;
 	}
-	if (DATA_IS_REF(exp_r_addr->data_type)) {
-		struct id *tr = new_temp(REF_TO_CONTENT(exp_r_addr->data_type));
+	if (exp_r_addr->variable_type->data_type == REF_VAR) {
+		struct id *tr = new_temp(
+		    new_var_type(exp_r_addr->variable_type->data_type, NOT_PTR));
 
 		cat_tac(exp, NEW_TAC_1(TAC_VAR, tr));
 		cat_tac(exp, NEW_TAC_2(TAC_DEREFER_GET, tr, exp_r_addr));
@@ -47,16 +49,16 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 		exp_r_addr = tr;
 	}
 
-	if (exp_l_addr->data_type == DATA_FLOAT ||
-	    exp_r_addr->data_type == DATA_FLOAT) {
+	if (exp_l_addr->variable_type->data_type == DATA_FLOAT ||
+	    exp_r_addr->variable_type->data_type == DATA_FLOAT) {
 		// 对于浮点数的运算，生成调用内部函数的三地址码
 
 		if ((TYPE_CHECK(exp_l_addr, exp_r_addr)) == 0) {
-			if (exp_l_addr->data_type == DATA_FLOAT) {
+			if (exp_l_addr->variable_type->data_type == DATA_FLOAT) {
 				struct op *cast_exp = type_casting(exp_l_addr, exp_r_addr);
 				exp_r_addr = cast_exp->addr;
 				cat_op(exp, cast_exp);
-			} else if (exp_r_addr->data_type == DATA_FLOAT) {
+			} else if (exp_r_addr->variable_type->data_type == DATA_FLOAT) {
 				struct op *cast_exp = type_casting(exp_r_addr, exp_l_addr);
 				exp_l_addr = cast_exp->addr;
 				cat_op(exp, cast_exp);
@@ -73,10 +75,11 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 			struct id *label_1 = new_label();
 			struct id *label_2 = new_label();
 
-			struct id *const_0 = add_const_identifier("0", ID_NUM, DATA_INT);
+			struct id *const_0 = add_const_identifier(
+			    "0", ID_NUM, new_var_type(DATA_INT, NOT_PTR));
 			const_0->number_info.num.num_int = 0;
-			struct id *const_1 =
-			    add_const_identifier("1.0", ID_NUM, DATA_FLOAT);
+			struct id *const_1 = add_const_identifier(
+			    "1.0", ID_NUM, new_var_type(DATA_FLOAT, NOT_PTR));
 			const_1->number_info.num.num_float = 1.0;
 
 			cat_tac(exp, NEW_TAC_2(TAC_IFZ, t, label_1));
@@ -98,23 +101,23 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 
 // 处理数组标识符
 struct op *process_array_identifier(struct op *array_op, int index) {
-	struct op *id_exp = new_op();
+	struct op *id_op = new_op();
 
 	struct id *array = array_op->addr;
-	if (!DATA_IS_POINTER(array->data_type)) {
+	if (array->variable_type->pointer_type != PTR_VAR) {
 		perror("id is not from an array");
 #ifndef HJJ_DEBUG
 		exit(0);
 #endif
 	}
 
-	struct id *t = new_temp(array->data_type);
-	struct op *num_op = process_int(index * TYPE_SIZE(array->data_type));
-	id_exp->addr = t;
-	cat_tac(id_exp, NEW_TAC_1(TAC_VAR, t));
-	cat_tac(id_exp, NEW_TAC_3(TAC_PLUS, t, array, num_op->addr));
+	struct id *t = new_temp(array->variable_type);
+	struct op *num_op = process_int(index * TYPE_SIZE(array->variable_type));
+	id_op->addr = t;
+	cat_tac(id_op, NEW_TAC_1(TAC_VAR, t));
+	cat_tac(id_op, NEW_TAC_3(TAC_PLUS, t, array, num_op->addr));
 
-	return id_exp;
+	return id_op;
 }
 
 struct op *process_add_identifier(char *name, int index) {
@@ -129,112 +132,141 @@ struct op *process_add_identifier(char *name, int index) {
 
 // 处理标识符
 struct op *process_identifier(char *name) {
-	struct op *id_exp = new_op();
+	struct op *id_op = new_op();
 
 	struct id *var = find_identifier(name);
-	id_exp->addr = var;
+	id_op->addr = var;
 
-	return id_exp;
+	return id_op;
+}
+
+struct op *process_instance_member(char *instance_name, char *member_name) {
+	struct op *instance_op = new_op();
+
+	struct id *instance = find_identifier(instance_name);
+	struct member_def *member = find_member(instance, member_name);
+	struct id *t_member =
+	    new_temp(new_var_type(member->variable_type->data_type, REF_VAR));
+	struct id *t_member_addr =
+	    new_temp(new_var_type(member->variable_type->data_type, PTR_VAR));
+	struct id *t_instance_addr =
+	    new_temp(new_var_type(instance->variable_type->data_type, PTR_VAR));
+	instance_op->addr = t_member;
+
+	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member));
+	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_addr));
+	cat_tac(instance_op, NEW_TAC_2(TAC_REFER, t_instance_addr, instance));
+	cat_tac(instance_op, NEW_TAC_3(TAC_PLUS, t_member_addr, t_instance_addr,
+	                               process_int(member->member_offset)->addr));
+	cat_tac(instance_op,
+	        NEW_TAC_2(TAC_VAR_REFER_INIT, t_member, t_member_addr));
+
+	return instance_op;
 }
 
 // 分配整数型数字符号
 struct op *process_int(int integer) {
-	struct op *int_exp = new_op();
+	struct op *int_op = new_op();
 
 	BUF_ALLOC(buf);  // 声明一个char数组变量buf，储存符号名
 	sprintf(buf, "%d", integer);
 	struct id *var = add_const_identifier(
-	    buf, ID_NUM, DATA_INT);  // 向符号表添加以buf为名的符号
+	    buf, ID_NUM,
+	    new_var_type(DATA_INT, NOT_PTR));  // 向符号表添加以buf为名的符号
 	var->number_info.num.num_int = integer;
-	int_exp->addr = var;
+	int_op->addr = var;
 
-	return int_exp;
+	return int_op;
 }
 
 // 分配浮点型数字符号
 struct op *process_float(double floatnum) {
-	struct op *float_exp = new_op();
+	struct op *float_op = new_op();
 
 	BUF_ALLOC(buf);
 	sprintf(buf, "%f", floatnum);
-	struct id *var = add_const_identifier(buf, ID_NUM, DATA_FLOAT);
+	struct id *var =
+	    add_const_identifier(buf, ID_NUM, new_var_type(DATA_FLOAT, NOT_PTR));
 	var->number_info.num.num_float = floatnum;
-	float_exp->addr = var;
+	float_op->addr = var;
 
-	return float_exp;
+	return float_op;
 }
 
 // 分配字符型数字符号
 struct op *process_char(char character) {
-	struct op *char_exp = new_op();
+	struct op *char_op = new_op();
 
 	BUF_ALLOC(buf);
 	sprintf(buf, "%c", character);
-	struct id *var = add_const_identifier(buf, ID_NUM, DATA_CHAR);
+	struct id *var =
+	    add_const_identifier(buf, ID_NUM, new_var_type(DATA_CHAR, NOT_PTR));
 	var->number_info.num.num_char = character;
-	char_exp->addr = var;
+	char_op->addr = var;
 
-	return char_exp;
+	return char_op;
 }
 
 // 处理形如"a++"和"++a"的表达式
 struct op *process_inc(struct op *id_op, int pos) {
-	struct op *inc_exp = new_op();
+	struct op *inc_op = new_op();
 	struct op *inc_temp = new_op();
 
 	struct id *var = id_op->addr;
 	inc_temp->addr = var;
 
-	if (var->data_type == DATA_FLOAT || var->data_type == DATA_DOUBLE) {
+	if (var->variable_type->data_type == DATA_FLOAT ||
+	    var->variable_type->data_type == DATA_DOUBLE) {
 		perror("wrong type");
 	}
 	if (pos == INC_HEAD) {
 		struct op *inc_done = process_calculate(NUM_ONE, inc_temp, TAC_PLUS);
-		inc_exp->addr = var;
+		inc_op->addr = var;
 
-		cat_op(inc_exp, inc_done);
-		cat_tac(inc_exp, NEW_TAC_2(TAC_ASSIGN, var, inc_done->addr));
+		cat_op(inc_op, inc_done);
+		cat_tac(inc_op, NEW_TAC_2(TAC_ASSIGN, var, inc_done->addr));
 	} else {
-		struct id *temp_pre = new_temp(var->data_type);
+		struct id *temp_pre = new_temp(var->variable_type);
 		struct op *inc_done = process_calculate(NUM_ONE, inc_temp, TAC_PLUS);
-		inc_exp->addr = temp_pre;
+		inc_op->addr = temp_pre;
 
-		cat_tac(inc_exp, NEW_TAC_2(TAC_ASSIGN, inc_done->addr, var));
-		cat_op(inc_exp, inc_done);
-		cat_tac(inc_exp, NEW_TAC_2(TAC_ASSIGN, var, inc_done->addr));
+		cat_tac(inc_op, NEW_TAC_2(TAC_ASSIGN, inc_done->addr, var));
+		cat_op(inc_op, inc_done);
+		cat_tac(inc_op, NEW_TAC_2(TAC_ASSIGN, var, inc_done->addr));
 	}
 
-	return inc_exp;
+	return inc_op;
 }
 
 // 处理形如"a--"和"--a"的表达式
 struct op *process_dec(struct op *id_op, int pos) {
-	struct op *dec_exp = new_op();
+	struct op *dec_op = new_op();
 	struct op *dec_temp = new_op();
 
 	struct id *var = id_op->addr;
 	dec_temp->addr = var;
 
-	if (var->data_type == DATA_FLOAT || var->data_type == DATA_DOUBLE) {
+	if (var->variable_type->data_type == DATA_FLOAT ||
+	    var->variable_type->data_type == DATA_DOUBLE) {
 		perror("wrong type");
 	}
 	if (pos == INC_HEAD) {
 		struct op *inc_done = process_calculate(NUM_ONE, dec_temp, TAC_MINUS);
-		dec_exp->addr = var;
+		dec_op->addr = var;
 
-		cat_op(dec_exp, inc_done);
-		cat_tac(dec_exp, NEW_TAC_2(TAC_ASSIGN, var, inc_done->addr));
+		cat_op(dec_op, inc_done);
+		cat_tac(dec_op, NEW_TAC_2(TAC_ASSIGN, var, inc_done->addr));
 	} else {
-		struct id *temp_pre = new_temp(var->data_type);
+		struct id *temp_pre = new_temp(var->variable_type);
 		struct op *inc_done = process_calculate(NUM_ONE, dec_temp, TAC_MINUS);
-		dec_exp->addr = temp_pre;
+		dec_op->addr = temp_pre;
 
-		cat_tac(dec_exp, NEW_TAC_2(TAC_ASSIGN, inc_done->addr, var));
-		cat_op(dec_exp, inc_done);
-		cat_tac(dec_exp, NEW_TAC_2(TAC_ASSIGN, var, inc_done->addr));
+		cat_tac(dec_op, NEW_TAC_2(TAC_ASSIGN, inc_done->addr, var));
+		cat_op(dec_op, inc_done);
+		cat_tac(dec_op, NEW_TAC_2(TAC_ASSIGN, var, inc_done->addr));
 	}
 
-	return dec_exp;
+	return dec_op;
 }
 
 // 处理实参列表
@@ -280,8 +312,9 @@ struct op *process_expression_list(struct op *arg_list_pre,
 	return exp_list;
 }
 
-int process_struct_type(char *name) {
-	return check_struct_name(name)->struct_info.struct_type;
+struct var_type *process_struct_type(char *name, int pointer_type) {
+	return new_var_type(check_struct_name(name)->struct_info.struct_type,
+	                    pointer_type);
 }
 
 /**************************************/
@@ -298,36 +331,34 @@ struct op *process_struct_definition(char *name,
 	new_struct->struct_info.next_struct = struct_table;
 	new_struct->struct_info.struct_type = cur_struct_type++;
 	struct_table = new_struct;
+	cur_member_offset = 0;
 
 	return struct_op;
 }
 
-struct member_def *process_definition(int data_type,
+struct member_def *process_definition(struct var_type *variable_type,
                                       struct member_def *definition_list) {
 	struct member_def *cur_definition = definition_list;
 	while (cur_definition) {
-		cur_definition->data_type = data_type;
+		cur_definition->variable_type = variable_type;
+		cur_definition->member_offset = cur_member_offset;
+		cur_member_offset += TYPE_SIZE(variable_type);
 		cur_definition = cur_definition->next_def;
 	}
 	return definition_list;
 }
 
-struct member_def *process_add_member(char *name, int index) {
-	return add_member_def(name, NO_DATA, index);
-}
-
 // 处理变量声明，为process_variable函数声明的变量加上类型
-struct op *process_declaration(int data_type, struct op *declaration_exp) {
+struct op *process_declaration(struct var_type *variable_type,
+                               struct op *declaration_exp) {
 	struct op *declaration = new_op();
 
 	struct tac *cur_declaration = declaration_exp->code;
 	while (
 	    cur_declaration) {  // 逐个修改包含已声明变量的declaration_exp表达式所含变量的类型
-		if (cur_declaration->id_1->pointer_info.index == NO_INDEX) {  //&&
-			// head->id_1->is_pointer == NOT_POINTER) {
-			cur_declaration->id_1->data_type = data_type;
-		} else {
-			cur_declaration->id_1->data_type = CONTENT_TO_POINTER(data_type);
+		cur_declaration->id_1->variable_type = variable_type;
+		if (cur_declaration->id_1->pointer_info.index != NO_INDEX) {
+			cur_declaration->id_1->variable_type->pointer_type = PTR_VAR;
 		}
 		cur_declaration = cur_declaration->next;
 	}
@@ -484,18 +515,18 @@ struct op *process_call(char *name, struct op *arg_list) {
 	struct op *call_stat = new_op();
 
 	struct id *func = find_func(name);
-	struct id *t = new_temp(func->data_type);
+	struct id *t = new_temp(func->variable_type);
 	call_stat->addr = t;
 
 	struct tac *arg = arg_list->code;
 	struct op *cast_arg_list =
 	    param_args_type_casting(func->function_info.param_list, arg_list);
 
-	if (func->data_type != DATA_VOID) {
+	if (func->variable_type->data_type != DATA_VOID) {
 		cat_tac(call_stat, NEW_TAC_1(TAC_VAR, t));
 	}
 	cat_op(call_stat, cast_arg_list);
-	if (func->data_type != DATA_VOID) {
+	if (func->variable_type->data_type != DATA_VOID) {
 		cat_tac(call_stat, NEW_TAC_2(TAC_CALL, t, func));
 	}
 
@@ -529,7 +560,8 @@ struct op *process_output_variable(char *name) {
 struct op *process_output_text(char *string) {
 	struct op *output_stat = new_op();
 
-	struct id *str = add_const_identifier(string, ID_STRING, NO_DATA);
+	struct id *str = add_const_identifier(
+	    string, ID_STRING, new_var_type(DATA_UNDEFINED, NOT_PTR));
 
 	cat_tac(output_stat, NEW_TAC_1(TAC_OUTPUT, str));
 
@@ -548,30 +580,32 @@ struct op *process_input(char *name) {
 }
 
 // 处理赋值表达式
-struct op *process_assign(struct op *leftval, struct op *exp) {
+struct op *process_assign(struct op *leftval_op, struct op *exp) {
 	struct op *assign_stat = new_op();
 
-	struct id *var = leftval->addr;
+	struct id *leftval = leftval_op->addr;
 	struct id *exp_temp = exp->addr;
 	struct id *t;  // used in ref
 	assign_stat->addr = exp_temp;
 
 	cat_op(assign_stat, exp);
-	if ((TYPE_CHECK(var, exp_temp)) == 0) {
-		if (POINTER_TO_CONTENT(var->data_type) != exp_temp->data_type &&
-		    REF_TO_CONTENT(var->data_type) != exp_temp->data_type) {
-			struct op *cast_exp = type_casting(var, exp_temp);
+	if ((TYPE_CHECK(leftval, exp_temp)) == 0) {
+		if (POINTER_TO_CONTENT(leftval->variable_type, exp_temp->variable_type) &&
+		    REF_TO_CONTENT(leftval->variable_type, exp_temp->variable_type)) {
+			struct op *cast_exp = type_casting(leftval, exp_temp);
 			exp_temp = cast_exp->addr;
 			cat_op(assign_stat, cast_exp);
 		}
 	}
-	cat_op(assign_stat, leftval);
-	if (DATA_IS_REF(var->data_type)) {
-		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, var, exp_temp));
-	} else if (var->pointer_info.temp_derefer_put) {
-		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, var, exp_temp));
+	cat_op(assign_stat, leftval_op);
+	if (leftval->variable_type->pointer_type == REF_VAR) {
+		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, leftval, exp_temp));
+	} else if (exp_temp->variable_type->pointer_type == REF_VAR) {
+		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_GET, leftval, exp_temp));
+	} else if (leftval->pointer_info.temp_derefer_put) {
+		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, leftval, exp_temp));
 	} else {
-		cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, var, exp_temp));
+		cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, leftval, exp_temp));
 	}
 
 	return assign_stat;
@@ -582,16 +616,16 @@ struct op *process_derefer_put(struct op *id_op) {
 	struct op *content_stat = new_op();
 
 	struct id *var = id_op->addr;
-	if (!DATA_IS_POINTER(var->data_type)) {
+	if (var->variable_type->pointer_type != PTR_VAR) {
 		perror("data is not a pointer");
 		printf("data name: %s\n", var->name);
-		printf("data type: %d\n", var->data_type);
+		printf("data type: %d\n", var->variable_type->data_type);
 #ifndef HJJ_DEBUG
 		exit(0);
 #endif
 	}
 
-	struct id *t = new_temp(var->data_type);
+	struct id *t = new_temp(var->variable_type);
 	t->pointer_info.temp_derefer_put = 1;
 	content_stat->addr = t;
 
@@ -607,14 +641,15 @@ struct op *process_derefer_get(struct op *id_op) {
 	struct op *content_stat = new_op();
 
 	struct id *var = id_op->addr;
-	if (!DATA_IS_POINTER(var->data_type)) {
+	if (var->variable_type->pointer_type != PTR_VAR) {
 		perror("data is not a pointer");
 #ifndef HJJ_DEBUG
 		exit(0);
 #endif
 	}
 
-	struct id *t = new_temp(POINTER_TO_CONTENT(var->data_type));
+	struct id *t =
+	    new_temp(new_var_type(var->variable_type->data_type, NOT_PTR));
 	content_stat->addr = t;
 
 	cat_op(content_stat, id_op);
@@ -629,19 +664,24 @@ struct op *process_reference(struct op *id_op) {
 	struct op *pointer_stat = new_op();
 
 	struct id *var = id_op->addr;
-	if (DATA_IS_POINTER(var->data_type)) {
+	if (var->variable_type->pointer_type == PTR_VAR) {
 		perror("data is a pointer");
 #ifndef HJJ_DEBUG
 		exit(0);
 #endif
 	}
 
-	struct id *t = new_temp(CONTENT_TO_POINTER(var->data_type));
+	struct id *t =
+	    new_temp(new_var_type(var->variable_type->data_type, PTR_VAR));
 	pointer_stat->addr = t;
 
 	cat_op(pointer_stat, id_op);
 	cat_tac(pointer_stat, NEW_TAC_1(TAC_VAR, t));
-	cat_tac(pointer_stat, NEW_TAC_2(TAC_REFER, t, var));
+	if (var->variable_type->pointer_type != REF_VAR) {
+		cat_tac(pointer_stat, NEW_TAC_2(TAC_REFER, t, var));
+	} else {
+		cat_tac(pointer_stat, NEW_TAC_2(TAC_ASSIGN, t, var));
+	}
 
 	return pointer_stat;
 }
@@ -673,12 +713,12 @@ struct op *process_function(struct op *function_head, struct op *block) {
 }
 
 // 处理函数头
-struct op *process_function_head(int data_type, char *name,
+struct op *process_function_head(struct var_type *variable_type, char *name,
                                  struct op *parameter_list) {
 	struct op *function_head = new_op();
 
 	struct id *func = add_const_identifier(
-	    name, ID_FUNC, data_type);  // 向符号表添加类型为函数的符号
+	    name, ID_FUNC, variable_type);  // 向符号表添加类型为函数的符号
 
 	cat_tac(function_head, NEW_TAC_1(TAC_LABEL, func));
 	cat_tac(function_head, NEW_TAC_0(TAC_BEGIN));
@@ -690,21 +730,22 @@ struct op *process_function_head(int data_type, char *name,
 }
 
 // 处理函数参数列表的开端，加入标识符
-struct op *process_parameter_list_head(int data_type, char *name) {
+struct op *process_parameter_list_head(struct var_type *variable_type,
+                                       char *name) {
 	struct op *parameter = new_op();
 
-	struct id *var = add_identifier(name, ID_VAR, data_type, NO_INDEX);
+	struct id *var = add_identifier(name, ID_VAR, variable_type, NO_INDEX);
 	cat_tac(parameter, NEW_TAC_1(TAC_PARAM, var));
 
 	return parameter;
 }
 
 // 处理函数参数列表，加入标识符
-struct op *process_parameter_list(struct op *param_list_pre, int data_type,
-                                  char *name) {
+struct op *process_parameter_list(struct op *param_list_pre,
+                                  struct var_type *variable_type, char *name) {
 	struct op *parameter_list = new_op();
 
-	struct id *var = add_identifier(name, ID_VAR, data_type, NO_INDEX);
+	struct id *var = add_identifier(name, ID_VAR, variable_type, NO_INDEX);
 	cat_op(parameter_list, param_list_pre);
 	cat_tac(parameter_list, NEW_TAC_1(TAC_PARAM, var));
 
@@ -731,7 +772,8 @@ struct op *param_args_type_casting(struct tac *func_param,
 	while (arg && param->type == TAC_PARAM) {
 		// 检查参数类型是否匹配
 		if (TYPE_CHECK(param->id_1, arg->id_1) == 0 &&
-		    REF_TO_CONTENT(param->id_1->data_type) != arg->id_1->data_type) {
+		    REF_TO_CONTENT(param->id_1->variable_type,
+		                   arg->id_1->variable_type)) {
 			// 如果类型不匹配，进行类型转换
 			struct op *cast_exp = type_casting(param->id_1, arg->id_1);
 
@@ -740,9 +782,10 @@ struct op *param_args_type_casting(struct tac *func_param,
 			arg->id_1 = cast_exp->addr;  // 更新 args_list 中的参数
 		}
 		// 如果实参是引用类型
-		else if (REF_TO_CONTENT(param->id_1->data_type) ==
-		         arg->id_1->data_type) {
-			struct id *t = new_temp(CONTENT_TO_POINTER(arg->id_1->data_type));
+		else if (REF_TO_CONTENT(param->id_1->variable_type,
+		                        arg->id_1->variable_type)) {
+			struct id *t = new_temp(
+			    new_var_type(arg->id_1->variable_type->data_type, PTR_VAR));
 
 			cat_tac(cast_args, NEW_TAC_1(TAC_VAR, t));
 			cat_tac(cast_args, NEW_TAC_2(TAC_REFER, t, arg->id_1));
@@ -767,10 +810,11 @@ struct op *param_args_type_casting(struct tac *func_param,
 struct op *type_casting(struct id *id_remain, struct id *id_casting) {
 	struct op *cast_exp = new_op();
 
-	int type_target = id_remain->data_type;
-	int type_src = id_casting->data_type;
+	int type_target = id_remain->variable_type->data_type;
+	int type_src = id_casting->variable_type->data_type;
 
-	struct id *t = new_temp(type_target);  // 分配临时变量
+	struct id *t = new_temp(new_var_type(
+	    type_target, id_remain->variable_type->pointer_type));  // 分配临时变量
 	cast_exp->addr = t;
 
 	char *casting_func = (char *)malloc(16);
