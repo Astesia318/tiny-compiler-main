@@ -120,10 +120,10 @@ void asm_code(struct tac *code) {
 
 		case TAC_VAR:
 			if (scope == LOCAL_TABLE) {
-				if (code->id_1->index == NO_INDEX) {
+				if (code->id_1->pointer_info.index == NO_INDEX) {
 					LOCAL_VAR_OFFSET(code->id_1, tof);
 				} else {
-					LOCAL_ARRAY_OFFSET(code->id_1, tof, code->id_1->index);
+					LOCAL_ARRAY_OFFSET(code->id_1, tof, code->id_1->pointer_info.index);
 				}
 			} else {
 				asm_gvar(code->id_1);
@@ -202,7 +202,7 @@ void asm_lc(struct id *s) {
 		for (int i = TYPE_SIZE(DATA_DOUBLE) - TYPE_SIZE(s->data_type);
 		     i < TYPE_SIZE(DATA_DOUBLE); i += TYPE_SIZE(DATA_FLOAT)) {
 			int temp;
-			memcpy(&temp, (void *)(&s->num) + 0, TYPE_SIZE(DATA_FLOAT));
+			memcpy(&temp, (void *)(&s->number_info.num) + 0, TYPE_SIZE(DATA_FLOAT));
 			input_str(obj_file, "\t.word	%d\n", temp);
 		}
 	}

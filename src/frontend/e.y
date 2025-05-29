@@ -19,8 +19,9 @@ void yyerror(char* msg);
 %}
 
 %union {
-    struct op* operation;
-    // struct var_list* variable_list;
+    struct op *operation;
+    struct member_def *definition;
+
     char* name;
     char* string;
 
@@ -63,12 +64,12 @@ void yyerror(char* msg);
 %type <operation> statement_block
 %type <operation> declaration_list
 %type <operation> declaration
-%type <operation> struct_definition
-%type <operation> definition_block
-%type <operation> definition_list
-%type <operation> definition
-%type <operation> member_list
-%type <operation> add_member
+%type <operation> member_definition
+%type <definition> definition_block
+%type <definition> definition_list
+%type <definition> definition
+%type <definition> member_list
+%type <definition> add_member
 %type <operation> variable_list
 %type <operation> statement_list
 %type <operation> statement
@@ -119,7 +120,7 @@ function_declaration_list : function_declaration { $$ = cpy_op($1); }
 
 function_declaration : function { $$ = cpy_op($1); }
 | declaration { $$ = cpy_op($1); }
-| struct_definition { $$ = cpy_op($1); }
+| member_definition { $$ = cpy_op($1); }
 ;
 
 function : function_head statement_block { reset_table(OUT_LOCAL_TABLE); $$ = process_function($1,$2); }
@@ -138,18 +139,19 @@ parameter_list : parameter_type IDENTIFIER { $$ = process_parameter_list_head($1
 /**************************************/
 /**************** stat ****************/
 /**************************************/
-struct_definition : STRUCT IDENTIFIER definition_block { $$ = process_struct_definition($2,$3); }
+member_definition : STRUCT IDENTIFIER definition_block { $$ = process_member_definition($2,$3); }
 
-definition_block : '{' definition_list '}' ';' { $$ = cpy_op($2); }
+definition_block : '{' definition_list '}' ';' { $$ = $2; }
 
-definition_list : definition { $$ = cpy_op($1); }
-| definition_list definition { $$ = cat_list($1,$2); }
+definition_list : definition { $$ = $1; }
+| definition_list definition { $$ = cat_def($1,$2); }
 ;
 
 definition : basic_type member_list ';' { $$ = process_definition($1,$2); }
 
-member_list : add_member { $$ = cpy_op($1); }
-| member_list ',' add_member { $$ = cat_list($1,$3);}
+member_list : add_member { $$ = $1; }
+| member_list ',' add_member { $$ = cat_def($1,$3); }
+;
 
 add_member : IDENTIFIER index_or_null { $$ = process_add_member($1,$2); }
 

@@ -176,7 +176,7 @@ void asm_load_var(struct id *s, const char *r) {
 		U_TYPE_UPPER_SYM("lla", r, s->label);  // 使用 U_TYPE_UPPER_IMM 宏
 		I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->data_type)), r, r, 0);
 	} else if (s->id_type == ID_NUM && s->data_type == DATA_INT) {
-		U_TYPE_UPPER_IMM("li", r, s->num);  // 使用 U_TYPE_UPPER_IMM 宏
+		U_TYPE_UPPER_IMM("li", r, s->number_info.num);  // 使用 U_TYPE_UPPER_IMM 宏
 	} else {                                // TEMP or VAR
 		if (s->scope == GLOBAL_TABLE) {
 			U_TYPE_UPPER_SYM("la", r, s->name);  // 使用 U_TYPE_UPPER_IMM 宏
