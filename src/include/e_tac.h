@@ -37,6 +37,7 @@
 // 类型检查中两操作数是否是赋值关系
 #define IS_NOT_ASSIGN 0
 #define IS_ASSIGN 1
+
 // 符号类型
 #define NO_TYPE -1  // 无类型
 #define ID_VAR 0    // 变量
@@ -46,6 +47,12 @@
 #define ID_LABEL 4   // 标签
 #define ID_STRING 5  // 字符串
 #define ID_STRUCT 6  // 结构体
+
+// 变量类型
+#define NOT_VAR 0
+#define BASIC_VAR 1
+#define PTR_VAR 2
+#define REF_VAR 3
 
 // 数据类型
 #define PTR_OFFSET 10
@@ -67,6 +74,7 @@
 #define DATA_RFLOAT 22   // 浮点型引用
 #define DATA_RDOUBLE 23  // 双精度浮点型引用
 #define DATA_RCHAR 24    // 单字符型引用
+#define DATA_STRUCT_INIT 100
 
 #define DATA_IS_POINTER(type) ((type >= DATA_PINT) && (type <= DATA_PCHAR))
 #define DATA_IS_REF(type) ((type >= DATA_RINT) && (type <= DATA_RCHAR))
@@ -199,6 +207,8 @@ struct member_def {
 
 struct strc_info {
 	struct member_def *definition_list;
+	int struct_type;
+
 	struct id *next_struct;
 };
 
@@ -206,6 +216,7 @@ struct id {
 	const char *name;
 
 	int id_type;
+	int var_type;
 	int data_type;
 
 	int scope;
@@ -257,6 +268,8 @@ extern struct id *struct_table;
 void reset_table(int direction);
 // void clear_table(int scope);
 struct id *find_identifier(const char *name);
+struct id *check_struct_type(int struct_type);
+struct id *check_struct_name(char *name);
 struct id *find_func(const char *name);
 struct member_def *add_member_def(char *name, int data_type, int index);
 struct id *add_identifier(const char *name, int id_type, int data_type,

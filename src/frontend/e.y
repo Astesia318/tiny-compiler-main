@@ -45,15 +45,12 @@ void yyerror(char* msg);
 %token <data_type> FLOAT
 %token <data_type> DOUBLE
 %token <data_type> CHAR
-%token <data_type> INT_PTR
-%token <data_type> LONG_PTR
-%token <data_type> FLOAT_PTR
-%token <data_type> DOUBLE_PTR
-%token <data_type> CHAR_PTR
 %token <index> INDEX
 %type <index> index_or_null
 %type <data_type> parameter_type
+%type <data_type> complex_type
 %type <data_type> void_type
+%type <data_type> struct_type
 %type <data_type> basic_type
 %type <operation> program
 %type <operation> function_declaration_list
@@ -64,7 +61,7 @@ void yyerror(char* msg);
 %type <operation> statement_block
 %type <operation> declaration_list
 %type <operation> declaration
-%type <operation> member_definition
+%type <operation> struct_definition
 %type <definition> definition_block
 %type <definition> definition_list
 %type <definition> definition
@@ -120,14 +117,14 @@ function_declaration_list : function_declaration { $$ = cpy_op($1); }
 
 function_declaration : function { $$ = cpy_op($1); }
 | declaration { $$ = cpy_op($1); }
-| member_definition { $$ = cpy_op($1); }
+| struct_definition { $$ = cpy_op($1); }
 ;
 
 function : function_head statement_block { reset_table(OUT_LOCAL_TABLE); $$ = process_function($1,$2); }
 | error {}
 ;
 
-function_head : basic_type IDENTIFIER '(' parameter_list ')' { $$ = process_function_head($1,$2,$4); reset_table(INTO_LOCAL_TABLE); }
+function_head : complex_type IDENTIFIER '(' parameter_list ')' { $$ = process_function_head($1,$2,$4); reset_table(INTO_LOCAL_TABLE); }
 | void_type IDENTIFIER '(' parameter_list ')' { $$ = process_function_head($1,$2,$4); reset_table(INTO_LOCAL_TABLE); }
 ;
 
@@ -139,7 +136,7 @@ parameter_list : parameter_type IDENTIFIER { $$ = process_parameter_list_head($1
 /**************************************/
 /**************** stat ****************/
 /**************************************/
-member_definition : STRUCT IDENTIFIER definition_block { $$ = process_member_definition($2,$3); }
+struct_definition : STRUCT IDENTIFIER definition_block { $$ = process_struct_definition($2,$3); }
 
 definition_block : '{' definition_list '}' ';' { $$ = $2; }
 
@@ -147,7 +144,7 @@ definition_list : definition { $$ = $1; }
 | definition_list definition { $$ = cat_def($1,$2); }
 ;
 
-definition : basic_type member_list ';' { $$ = process_definition($1,$2); }
+definition : complex_type member_list ';' { $$ = process_definition($1,$2); }
 
 member_list : add_member { $$ = $1; }
 | member_list ',' add_member { $$ = cat_def($1,$3); }
@@ -161,7 +158,7 @@ declaration_list : { $$ = new_op(); }
 | declaration_list declaration { $$ = cat_list($1,$2); }
 ;
 
-declaration : basic_type variable_list ';' { $$ = process_declaration($1,$2); }
+declaration : complex_type variable_list ';' { $$ = process_declaration($1,$2); }
 
 variable_list : add_identifier { $$ = cpy_op($1); }
 | variable_list ',' add_identifier { $$ = cat_list($1,$3); }
@@ -299,16 +296,21 @@ parameter_type : basic_type '&' { $$ = $1 + REF_OFFSET; }
 
 void_type : VOID { $$ = DATA_VOID; }
 
+complex_type : struct_type { $$ = $1 }
+| basic_type { $$ = $1; }
+
+struct_type : STRUCT IDENTIFIER { $$ = process_struct_type($2); }
+
 basic_type : INT { $$ = DATA_INT; }
 | LONG { $$ = DATA_LONG; }
 | FLOAT { $$ = DATA_FLOAT; }
 | DOUBLE { $$ = DATA_DOUBLE; }
 | CHAR { $$ = DATA_CHAR; }
-| INT_PTR { $$ = DATA_PINT; }
-| LONG_PTR { $$ = DATA_PLONG; }
-| FLOAT_PTR { $$ = DATA_PFLOAT; }
-| DOUBLE_PTR { $$ = DATA_PDOUBLE; }
-| CHAR_PTR { $$ = DATA_PCHAR; }
+| INT '*' { $$ = DATA_PINT; }
+| LONG '*' { $$ = DATA_PLONG; }
+| FLOAT '*' { $$ = DATA_PFLOAT; }
+| DOUBLE '*' { $$ = DATA_PDOUBLE; }
+| CHAR '*' { $$ = DATA_PCHAR; }
 ;
 
 index_or_null : INDEX { $$ = $1; }
