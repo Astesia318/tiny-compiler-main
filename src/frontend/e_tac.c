@@ -144,7 +144,7 @@ struct id *check_struct_name(char *name) {
 	return NULL;
 }
 
-struct member_def *find_member(struct id *instance, char *member_name) {
+struct member_def *find_member(struct id *instance, const char *member_name) {
 	struct id *struct_def =
 	    check_struct_type(instance->variable_type->data_type);
 	struct member_def *cur_member_def = struct_def->struct_info.definition_list;
@@ -319,20 +319,53 @@ struct var_type *new_const_type(int data_type, int pointer_level) {
 	return new_var_type(data_type, pointer_level, 0);
 }
 
-struct arr_info *increase_array_level(struct arr_info *array_info, int size) {
+struct arr_info *increase_array_level(struct arr_info *array_info,
+                                      struct arr_info *new_info,
+                                      int const_or_not) {
 	array_info->max_level += 1;
-	array_info->array_index[array_info->max_level] = size;
-	array_info->array_offset[array_info->max_level] *= size;
+	int cur_level = array_info->max_level;
+	if (const_or_not == IS_CONST_INDEX) {
+		int size = new_info->const_index[0];
+		array_info->const_or_not[cur_level] = IS_CONST_INDEX;
+		array_info->const_index[cur_level] = size;
+		array_info->array_offset[cur_level] *= size;
+	} else {
+		struct op *exp = new_info->nonconst_index[0];
+		array_info->const_or_not[cur_level] = NOT_CONST_INDEX;
+		array_info->nonconst_index[cur_level] = exp;
+		array_info->in_declaration_or_not = NOT_DECLARATION;
+	}
 	return array_info;
 }
 
-struct arr_info *new_array_info(int first_level_size) {
+struct arr_info *new_array_info(struct op *first_exp, int const_or_not) {
 	struct arr_info *new_info;
 	MALLOC_AND_SET_ZERO(new_info, 1, struct arr_info);
 	new_info->max_level = 0;
-	new_info->array_index[0] = first_level_size;
-	new_info->array_offset[0] = first_level_size;
+	new_info->in_declaration_or_not = MAYBE_DECLARATION;
+	if (const_or_not == IS_CONST_INDEX) {
+		int first_size = first_exp->addr->number_info.num.num_int;
+		new_info->const_or_not[0] = IS_CONST_INDEX;
+		new_info->const_index[0] = first_size;
+		new_info->array_offset[0] = first_size;
+	} else {
+		new_info->const_or_not[0] = NOT_CONST_INDEX;
+		new_info->nonconst_index[0] = first_exp;
+		new_info->in_declaration_or_not = NOT_DECLARATION;
+	}
 	return new_info;
+}
+
+struct member_ftch *new_member_fetch(int is_pointer_fetch, char *name,
+                                     struct arr_info *index_info) {
+	struct member_ftch *new_fetch;
+	MALLOC_AND_SET_ZERO(new_fetch, 1, struct member_ftch);
+	char *member_name = (char *)malloc(sizeof(char) * strlen(name));
+	strcpy(member_name, name);
+	new_fetch->name = member_name;
+	new_fetch->is_pointer_fetch = is_pointer_fetch;
+	new_fetch->index_info = index_info;
+	return new_fetch;
 }
 
 const char *id_to_str(struct id *id) {
@@ -363,12 +396,12 @@ void output_struct(FILE *f, struct id *id_struct) {
 	struct member_def *cur_definition = id_struct->struct_info.definition_list;
 	while (cur_definition) {
 		if (cur_definition->array_info == NO_INDEX) {
-			PRINT_2("member %s %s\n",
+			PRINT_2("member %s %s",
 			        data_to_str(cur_definition->variable_type,
 			                    cur_definition->array_info),
 			        cur_definition->name);
 		} else {
-			PRINT_2("member %s %s\n",
+			PRINT_2("member %s %s",
 			        data_to_str(cur_definition->variable_type,
 			                    cur_definition->array_info),
 			        cur_definition->name);
@@ -376,11 +409,11 @@ void output_struct(FILE *f, struct id *id_struct) {
 			     cur_level <= cur_definition->array_info->max_level;
 			     cur_level++) {
 				PRINT_1("[%d]",
-				        cur_definition->array_info->array_index[cur_level]);
+				        cur_definition->array_info->const_index[cur_level]);
 			}
-			PRINT_0("\n");
 		}
 		cur_definition = cur_definition->next_def;
+		PRINT_0("\n");
 	}
 }
 
@@ -425,7 +458,7 @@ const char *data_to_str(struct var_type *variable_type,
 		}
 	}
 	if (variable_type->is_reference) {
-		strcat(buf, " &");
+		strcat(buf, "&");
 	}
 	return buf;
 }
@@ -559,7 +592,7 @@ void output_tac(FILE *f, struct tac *code) {
 				        id_to_str(id_1));
 				for (int cur_level = 0;
 				     cur_level <= id_1->array_info->max_level; cur_level++) {
-					PRINT_1("[%d]", id_1->array_info->array_index[cur_level]);
+					PRINT_1("[%d]", id_1->array_info->const_index[cur_level]);
 				}
 				PRINT_0("\n");
 			}
@@ -600,7 +633,7 @@ void source_to_tac(FILE *f, struct tac *code) {
 void input_str(FILE *f, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
-#ifdef HJJ_DEBUG
+#ifdef HJJ_TERMINAL
 	vfprintf(stdout, format, args);
 #else
 	vfprintf(f, format, args);

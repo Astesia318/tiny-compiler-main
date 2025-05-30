@@ -47,13 +47,6 @@ MULTI_COMMENT				"/*"([^\*]|(\*)*[^\*/])*(\*)*"*/"
 "for"  						{ return FOR; }
 "->"  						{ return PSTRUCT_ACCESS; }
 
-\[{INT_CONST}\]  			{ 
-								BUF_ALLOC(buf);
-								memcpy(buf, yytext + 1, strlen(yytext) - 2);
-								yylval.index = atoi(buf);
-								return INDEX;
-							}
-
 {ID}						{ yylval.name = strdup(yytext); return IDENTIFIER; }
 {INT_CONST} 				{ yylval.num_int = atoi(yytext); return NUM_INT; }
 {FLOAT_CONST} 				{ yylval.num_float = strtod(yytext,NULL); return NUM_FLOAT; }
