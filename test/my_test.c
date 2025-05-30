@@ -30,13 +30,13 @@ int global;
 int main() {
 	// struct cls classes[10];
 	// struct teacher *advisor;
-	char a;
-	char *p;
-	p = &a;
-	a = 'a';
-	*p = 'b';
-	global = 10;
-	output global;
+	int a[40];
+	int i;
+	int x;
+	for (i = 0; i < 40; i = i + 1) {
+		a[i] = i;
+	}
+
 	// int i, j;
 	// for (i = 0; i < 10; i = i + 1) {
 	// 	init_class(classes[i], i, advisor);

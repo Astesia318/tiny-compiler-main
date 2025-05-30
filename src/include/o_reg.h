@@ -82,16 +82,19 @@ extern const char *args_name[];
                // XXX:这里认为DATA_UNDEFINED是string
                // hjj:DATA_UNDEFINED改成了DATA_UNDEFINED
 
-#define TYPE_SIZE(variable_type)                       \
-	((variable_type)->pointer_level     ? 4               \
-	 : (variable_type)->is_reference ? 4               \
-	 : (variable_type)->data_type >= DATA_STRUCT_INIT  \
-	     ? check_struct_type(variable_type->data_type) \
-	           ->struct_info.struct_offset             \
+#define TYPE_SIZE(variable_type, array_info)                     \
+	((array_info) != NO_INDEX                                    \
+	     ? (array_info)->array_offset[(array_info)->max_level] * \
+	           DATA_SIZE((variable_type)->data_type)             \
+	 : (variable_type)->pointer_level ? 4                        \
+	 : (variable_type)->is_reference  ? 4                        \
+	 : (variable_type)->data_type >= DATA_STRUCT_INIT            \
+	     ? check_struct_type((variable_type)->data_type)         \
+	           ->struct_info.struct_offset                       \
 	     : DATA_SIZE((variable_type)->data_type))
 
 #define TYPE_ALIGN(variable_type)                       \
-	((variable_type)->pointer_level                    ? 2 \
+	((variable_type)->pointer_level                 ? 2 \
 	 : (variable_type)->is_reference                ? 2 \
 	 : (variable_type)->data_type == DATA_UNDEFINED ? 2 \
 	 : (variable_type)->data_type == DATA_INT       ? 2 \
@@ -102,7 +105,8 @@ extern const char *args_name[];
 	     ? 3                                            \
 	     : -1) /* 或者返回一个错误码，比如 -1, 或者 ((void)0) 引发编译错误 */
 #define max(a, b) (a > b ? a : b)
-#define ALIGN(data_size) (max(DATA_ALIGN, data_size))
+#define ALIGN(data_size) \
+	((data_size + DATA_ALIGN - 1) / DATA_ALIGN * DATA_ALIGN)
 #define STORE_OP(data_size)        \
 	((data_size) == WORD    ? "sw" \
 	 : (data_size) == HWORD ? "sh" \
@@ -113,21 +117,21 @@ extern const char *args_name[];
 	 : (data_size) == HWORD ? "lhu" \
 	 : (data_size) == BYTE  ? "lbu" \
 	                        : "")
-#define LOCAL_VAR_OFFSET(identifier, _offset)                 \
-	do {                                                      \
-		int data_size = TYPE_SIZE(identifier->variable_type); \
-		identifier->scope = LOCAL_TABLE;                      \
-		identifier->offset = _offset - data_size;             \
-		_offset -= ALIGN(data_size);                          \
+#define LOCAL_VAR_OFFSET(identifier, _offset, array_info)                 \
+	do {                                                                  \
+		int data_size = TYPE_SIZE(identifier->variable_type, array_info); \
+		identifier->scope = LOCAL_TABLE;                                  \
+		identifier->offset = _offset - data_size;                         \
+		_offset -= ALIGN(data_size);                                      \
 	} while (0)
 
-#define LOCAL_ARRAY_OFFSET(identifier, _offset, total_offset)        \
-	do {                                                      \
-		int data_size = TYPE_SIZE(identifier->variable_type); \
-		identifier->scope = LOCAL_TABLE;                      \
-		identifier->offset = _offset - total_offset * data_size;     \
-		_offset -= ALIGN(total_offset * data_size);                  \
-	} while (0)
+// #define LOCAL_ARRAY_OFFSET(identifier, _offset, total_offset)    \
+// 	do {                                                         \
+// 		int data_size = TYPE_SIZE(identifier->variable_type);    \
+// 		identifier->scope = LOCAL_TABLE;                         \
+// 		identifier->offset = _offset - total_offset * data_size; \
+// 		_offset -= ALIGN(total_offset * data_size);              \
+// 	} while (0)
 
 #define OP_TO_CAL(op, a, b)           \
 	(strcmp(op, "add") == 0   ? a + b \

@@ -182,9 +182,9 @@ void asm_cond(char *op, struct id *a, const char *l) {
 
 	if (a != NULL) {
 		int r = reg_find(a);
-		input_str(obj_file, "	%s %s,zero,.%s\n", op, reg_name[r], l);
+		input_str(obj_file, "	%s %s,zero,%s\n", op, reg_name[r], l);
 	} else {
-		input_str(obj_file, "	%s .%s\n", op, l);
+		input_str(obj_file, "	%s %s\n", op, l);
 	}
 }
 
@@ -223,9 +223,11 @@ void asm_stack_pivot(struct tac *code) {
 	struct tac *cur;
 	for (cur = code; cur != NULL; cur = cur->next) {
 		if (cur->type == TAC_VAR) {
-			var_size += ALIGN(TYPE_SIZE(cur->id_1->variable_type));
+			var_size +=
+			    ALIGN(TYPE_SIZE(cur->id_1->variable_type,cur->id_1->array_info));
 		} else if (cur->type == TAC_PARAM) {
-			param_size += ALIGN(TYPE_SIZE(cur->id_1->variable_type));
+			param_size +=
+			    ALIGN(TYPE_SIZE(cur->id_1->variable_type,cur->id_1->array_info));
 		} else if (cur->type == TAC_END) {
 			break;
 		}
@@ -245,7 +247,7 @@ void asm_param(struct tac *code) {
 	struct tac *cur = code->next;
 	int data_size;
 	while (cur->type == TAC_PARAM) {
-		LOCAL_VAR_OFFSET(cur->id_1, oof);
+		LOCAL_VAR_OFFSET(cur->id_1, oof, code->id_1->array_info);
 		// TODO:
 		asm_store_var(cur->id_1, args_name[cnt]);
 		cur = cur->next;
@@ -282,7 +284,7 @@ void asm_call(struct tac *code, struct id *a, struct id *b) {
 void asm_label(struct id *a) {
 	for (int r = R_GEN; r < R_NUM; r++) rdesc_clear_all(r);
 	if (a->id_type == ID_LABEL) {
-		input_str(obj_file, ".%s:\n", a->name);
+		input_str(obj_file, "%s:\n", a->name);
 	} else if (a->id_type == ID_FUNC) {
 		input_str(obj_file, "	.text\n");
 		input_str(obj_file, "	.align	2\n");
@@ -293,7 +295,7 @@ void asm_label(struct id *a) {
 }
 
 void asm_gvar(struct id *a) {
-	int data_size = TYPE_SIZE(a->variable_type);
+	int data_size = TYPE_SIZE(a->variable_type, a->array_info);
 	a->scope = 0; /* global var */
 	input_str(obj_file, "	.globl	%s\n", a->name);
 	input_str(obj_file, "	.bss\n");

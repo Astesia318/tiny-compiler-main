@@ -147,7 +147,7 @@ static struct op *process_array_identifier(struct op *array_op,
 			    process_int(index_info->const_index[cur_level] *
 			                array_info->array_offset[array_info->max_level] /
 			                array_info->array_offset[cur_level] *
-			                TYPE_SIZE(array->variable_type));
+			                TYPE_SIZE(array->variable_type,NO_INDEX));
 
 			cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_2));
 			cat_tac(id_op, NEW_TAC_3(TAC_PLUS, t_2, t_1, num_op->addr));
@@ -165,11 +165,12 @@ static struct op *process_array_identifier(struct op *array_op,
 			                          index->variable_type->pointer_level, 0));
 
 			cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_2));
+			cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_inc));
 			cat_op(id_op, exp_op);
 			cat_tac(
 			    id_op,
 			    NEW_TAC_3(TAC_MULTIPLY, t_inc, index,
-			              process_int(TYPE_SIZE(array->variable_type))->addr));
+			              process_int(TYPE_SIZE(array->variable_type,NO_INDEX))->addr));
 			cat_tac(id_op, NEW_TAC_3(TAC_PLUS, t_2, t_1, t_inc));
 
 			t_1 = t_2;
@@ -444,7 +445,7 @@ struct member_def *process_definition(struct var_type *variable_type,
 			    cur_definition->array_info->max_level + 1;
 		}
 		cur_definition->member_offset = cur_member_offset;
-		cur_member_offset += TYPE_SIZE(variable_type);
+		cur_member_offset += TYPE_SIZE(variable_type,NO_INDEX);
 
 		cur_definition = cur_definition->next_def;
 	}

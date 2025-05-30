@@ -126,14 +126,8 @@ void asm_code(struct tac *code) {
 
 		case TAC_VAR:
 			if (scope == LOCAL_TABLE) {
-				if (id_1->array_info != NO_INDEX) {
-					int total_offset =
-					    id_1->array_info
-					        ->array_offset[id_1->array_info->max_level];
-					LOCAL_ARRAY_OFFSET(id_1, tof, total_offset);
-				} else {
-					LOCAL_VAR_OFFSET(id_1, tof);
-				}
+				LOCAL_VAR_OFFSET(id_1, tof, id_1->array_info);
+
 			} else {
 				asm_gvar(id_1);
 			}
@@ -159,7 +153,7 @@ void tac_to_obj() {
 
 	for (int r = 0; r < R_NUM; r++) rdesc[r].var = NULL;
 
-	//asm_head();//这个，不需要了
+	// asm_head();//这个，不需要了
 
 	struct tac *cur;
 	for (cur = tac_head; cur != NULL; cur = cur->next) {
@@ -208,7 +202,8 @@ void asm_lc(struct id *s) {
 #if DEBUG_PRINT == 1
 		input_str(obj_file, "\t\t\t\t\t\t\t#	%s\n", t);
 #endif
-		for (int i = DATA_SIZE(DATA_DOUBLE) - TYPE_SIZE(s->variable_type);
+		for (int i =
+		         DATA_SIZE(DATA_DOUBLE) - TYPE_SIZE(s->variable_type, NO_INDEX);
 		     i < DATA_SIZE(DATA_DOUBLE); i += DATA_SIZE(DATA_FLOAT)) {
 			int temp;
 			memcpy(&temp, (void *)(&s->number_info.num) + 0,

@@ -24,7 +24,7 @@ static struct id *_find_identifier(const char *name, struct id **id_table,
 	while (cur) {
 		if (cur->name && !strcmp(name, cur->name) &&
 		    (check == CHECK_ID_NOT_EXIST ||
-		     !ID_IS_CONST(cur))) {  // check exist时找到的必须是标识符
+		     !ID_IS_CONST(cur->id_type))) {  // check exist时找到的必须是标识符
 			has_finded = 1;
 			id_wanted = cur;
 			break;
@@ -52,7 +52,7 @@ static struct id **_choose_id_table(int table) {
 
 static struct id *_collide_identifier(const char *name, int id_type,
                                       struct var_type *variable_type) {
-	if (ID_IS_GCONST(id_type, variable_type->data_type))
+	if (ID_IS_GLOBAL(id_type))
 		return _find_identifier(name, _choose_id_table(GLOBAL_TABLE),
 		                        CHECK_ID_NOT_EXIST);
 	else
@@ -168,7 +168,8 @@ struct id *add_identifier(const char *name, int id_type,
 	// lyc:对于text float double类型常量将其放到全局表里
 	// hjj: so as function and struct...原因是类型转换时会添加func,
 	// 这个func应当到global table。 hjj: 不过到层次结构可能会改变
-	if (ID_IS_GCONST(id_type, variable_type->data_type))
+	// lyc: 说得对，但是还是改回去GCONST了，使用GLOBAL代替
+	if (ID_IS_GLOBAL(id_type))
 		return _add_identifier(name, id_type, variable_type,
 		                       _choose_id_table(GLOBAL_TABLE), array_info);
 	else
