@@ -138,6 +138,8 @@
 
 #define TAC_IS_CMP(cal) (cal >= TAC_EQ && cal <= TAC_GE)
 #define ID_IS_CONST(id) (id->id_type == ID_NUM || id->id_type == ID_STRING)
+#define ID_IS_INTCONST(id_type, data_type) \
+	(id_type == ID_NUM && (data_type == DATA_INT || data_type == DATA_CHAR))
 #define ID_IS_GCONST(id_type, data_type)           \
 	(id_type == ID_FUNC || id_type == ID_STRING || \
 	 id_type == ID_NUM &&                          \

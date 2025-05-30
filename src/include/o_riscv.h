@@ -27,9 +27,11 @@
 #define U_TYPE_UPPER_IMM(op_mnemonic, dest_reg_name, immediate) \
 	input_str(obj_file, "\t%s %s, %d\n", op_mnemonic, dest_reg_name, immediate)
 // la lla
-#define U_TYPE_UPPER_SYM(op_mnemonic, dest_reg_name, symbol_no)         \
-	input_str(obj_file, "\t%s %s, .LC%d\n", op_mnemonic, dest_reg_name, \
-	          symbol_no)
+#define U_TYPE_UPPER_SYM(op_mnemonic, dest_reg_name, symbol_no)              \
+	op_mnemonic == "lla" ? input_str(obj_file, "\t%s %s, .LC%d\n",           \
+	                                 op_mnemonic, dest_reg_name, symbol_no)  \
+	                     : input_str(obj_file, "\t%s %s, %s\n", op_mnemonic, \
+	                                 dest_reg_name, symbol_no)
 
 // jr
 #define J_TYPE_JUMP_REG(op_mnemonic, dest_reg_name) \

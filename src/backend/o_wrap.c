@@ -159,7 +159,7 @@ void tac_to_obj() {
 
 	for (int r = 0; r < R_NUM; r++) rdesc[r].var = NULL;
 
-	asm_head();
+	//asm_head();//这个，不需要了
 
 	struct tac *cur;
 	for (cur = tac_head; cur != NULL; cur = cur->next) {

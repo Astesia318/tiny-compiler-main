@@ -284,6 +284,7 @@ void asm_label(struct id *a) {
 	if (a->id_type == ID_LABEL) {
 		input_str(obj_file, ".%s:\n", a->name);
 	} else if (a->id_type == ID_FUNC) {
+		input_str(obj_file, "	.text\n");
 		input_str(obj_file, "	.align	2\n");
 		input_str(obj_file, "	.globl	%s\n", a->name);
 		input_str(obj_file, "	.type	%s,@function\n", a->name);
@@ -303,11 +304,11 @@ void asm_gvar(struct id *a) {
 	if (a->array_info != NO_INDEX) {
 		int total_offset =
 		    a->array_info->array_offset[a->array_info->max_level];
-		input_str(obj_file, "	.zero	%d",
-		          total_offset *
-		              data_size);  // XXX:需要实现全局变量赋值后作改动
+		input_str(
+		    obj_file, "	.zero	%d\n",
+		    total_offset * data_size);  // XXX:需要实现全局变量赋值后作改动
 	} else {
-		input_str(obj_file, "	.zero	%d",
+		input_str(obj_file, "	.zero	%d\n",
 		          data_size);  // XXX:需要实现全局变量赋值后作改动
 	}
 }

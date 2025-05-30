@@ -87,6 +87,7 @@ static struct id *_add_identifier(const char *name, int id_type,
 	new_id->name = id_name;
 	new_id->id_type = id_type;
 	new_id->variable_type = variable_type;
+	new_id->scope = scope;
 	new_id->array_info = array_info;
 	new_id->next = *id_table;
 	*id_table = new_id;

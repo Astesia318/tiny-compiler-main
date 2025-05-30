@@ -282,7 +282,7 @@ const_val : NUM_INT { $$ = process_int($1); }
 ;
 
 // 这么写是因为改成star_or_null的形式会出现神秘的无法解析全局变量的冲突
-add_identifier : IDENTIFIER const_index { $$ = process_add_identifier($1,$2) }
+add_identifier : IDENTIFIER const_index { $$ = process_add_identifier($1,$2); }
 | IDENTIFIER { $$ = process_add_identifier($1,NO_INDEX); }
 
 deref_identifier : '*' deref_identifier { $$ = process_derefer($2); }
