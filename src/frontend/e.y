@@ -21,6 +21,7 @@ void yyerror(char* msg);
 %union {
     struct op *operation;
     struct member_def *definition;
+    struct member_ftch *member_fetch;
     struct arr_info *array_info;
     struct var_type *variable_type;
 
@@ -32,8 +33,6 @@ void yyerror(char* msg);
     char num_char;
 
     int data_type;
-
-    int index;
 }
 
 %token <name> IDENTIFIER
@@ -47,9 +46,9 @@ void yyerror(char* msg);
 %token <data_type> FLOAT
 %token <data_type> DOUBLE
 %token <data_type> CHAR
-%token <index> INDEX
 %type <array_info> index
-%type <array_info> index_or_null
+%type <array_info> nonconst_index
+%type <array_info> const_index
 %type <variable_type> void_type
 %type <variable_type> complex_type
 %type <variable_type> pointer_type
@@ -82,12 +81,12 @@ void yyerror(char* msg);
 %type <operation> break_statement
 %type <operation> continue_statement
 %type <operation> call_statement
-%type <operation> statement_or_expression_or_null
 %type <operation> assign_statement_or_null
 %type <operation> argument_list
 %type <operation> expression_list
 %type <operation> left_val
 %type <operation> right_val
+%type <operation> nonconst_right_val
 %type <operation> expression
 %type <operation> inc_expression
 %type <operation> dec_expression
@@ -95,8 +94,9 @@ void yyerror(char* msg);
 %type <operation> const_val
 %type <operation> add_identifier
 %type <operation> deref_identifier
-%type <operation> array_identifier
-%type <operation> existed_identifier
+%type <operation> identifier
+/* %type <member_fetch> member_index */
+%type <member_fetch> member
 
 %token EQ NE LT LE GT GE
 %token IF ELSE WHILE FOR BREAK CONTINUE INPUT OUTPUT RETURN STRUCT PSTRUCT_ACCESS
@@ -153,7 +153,8 @@ member_list : add_member { $$ = $1; }
 | member_list ',' add_member { $$ = cat_def($1,$3); }
 ;
 
-add_member : IDENTIFIER index_or_null { $$ = add_member_def_raw($1,$2); }
+add_member : IDENTIFIER index { $$ = add_member_def_raw($1,$2); }
+| IDENTIFIER { $$ = add_member_def_raw($1,NO_INDEX); }
 
 statement_block: '{' declaration_list statement_list '}' { $$ = cat_list($2,$3); }
 
@@ -207,7 +208,7 @@ for_head : FOR { block_initialize(); }
 
 while_statement : while_head '(' right_val ')' statement_block { $$ = process_while($3,$5); }
 
-for_statement : for_head '(' assign_statement_or_null ';' expression_or_null ';' statement_or_expression_or_null ')' statement_block 
+for_statement : for_head '(' assign_statement_or_null ';' expression_or_null ';' assign_statement_or_null ')' statement_block 
                 { $$ = process_for($3,$5,$7,$9); }
 
 break_statement : BREAK { $$ = process_break(); }
@@ -215,11 +216,6 @@ break_statement : BREAK { $$ = process_break(); }
 continue_statement : CONTINUE { $$ = process_continue(); }
 
 call_statement : IDENTIFIER '(' argument_list ')' { $$ = process_call($1,$3); }
-
-statement_or_expression_or_null : statement { $$ = cpy_op($1); }
-| expression { $$ = cpy_op($1); }
-| { $$ = new_op(); }
-;
 
 assign_statement_or_null : assign_statement { $$ = cpy_op($1); }
 | { $$ = new_op(); }
@@ -237,17 +233,18 @@ expression_list : expression_list ',' right_val { $$ = process_expression_list($
 ;
 
 left_val : deref_identifier { $$ = process_derefer_put($1); }
-| array_identifier { $$ = process_derefer_put($1); }
-| existed_identifier { $$ = cpy_op($1); }
+| identifier { $$ = cpy_op($1); }
 ;
 
-right_val : deref_identifier { $$ = process_derefer_get($1); }
+right_val : nonconst_right_val { $$ = cpy_op($1); }
+| const_val { $$ = cpy_op($1); }
+;
+
+nonconst_right_val : deref_identifier { $$ = process_derefer_get($1); }
 | '&' expression { $$ = process_reference($2); }
 | expression { $$ = cpy_op($1); }
-| '&' existed_identifier { $$ = process_reference($2); }
-| array_identifier { $$ = process_derefer_get($1); }
-| existed_identifier { $$ = cpy_op($1); }
-| const_val { $$ = cpy_op($1); }
+| '&' identifier { $$ = process_reference($2); }
+| identifier { $$ = cpy_op($1); }
 ;
 
 expression : inc_expression { $$ = cpy_op($1); }
@@ -285,19 +282,22 @@ const_val : NUM_INT { $$ = process_int($1); }
 ;
 
 // 这么写是因为改成star_or_null的形式会出现神秘的无法解析全局变量的冲突
-add_identifier : IDENTIFIER index_or_null { $$ = process_add_identifier($1,$2) }
+add_identifier : IDENTIFIER const_index { $$ = process_add_identifier($1,$2) }
+| IDENTIFIER { $$ = process_add_identifier($1,NO_INDEX); }
 
 deref_identifier : '*' deref_identifier { $$ = process_derefer($2); }
-| '*' array_identifier { $$ = process_derefer($2); }
-| '*' existed_identifier { $$ = process_derefer($2); }
+| '*' identifier { $$ = process_derefer($2); }
 | '*' expression { $$ = process_derefer($2); }
 
-array_identifier : existed_identifier index { $$ = process_array_identifier($1,$2); free($2); }
-
-existed_identifier : IDENTIFIER '.' IDENTIFIER { $$ = process_instance_member($1,$3); }
-| IDENTIFIER PSTRUCT_ACCESS IDENTIFIER { $$ = process_pointer_instance_member($1,$3); }
-| IDENTIFIER { $$ = process_identifier($1); }
+identifier : identifier member { $$ = process_instance_member($1,$2); }
+| IDENTIFIER index { $$ = process_identifier($1,$2); }
+| IDENTIFIER { $$ = process_identifier($1,NO_INDEX); }
 ;
+
+member : '.' IDENTIFIER index { $$ = new_member_fetch(NOT_POINTER_FETCH,$2,$3); }
+| PSTRUCT_ACCESS IDENTIFIER index { $$ = new_member_fetch(IS_POINTER_FETCH,$2,$3); }
+| '.' IDENTIFIER { $$ = new_member_fetch(NOT_POINTER_FETCH,$2,NO_INDEX); }
+| PSTRUCT_ACCESS IDENTIFIER { $$ = new_member_fetch(IS_POINTER_FETCH,$2,NO_INDEX); }
 
 void_type : VOID { $$ = new_var_type(DATA_VOID,0,0); }
 
@@ -316,13 +316,15 @@ basic_type : INT { $$ = new_var_type(DATA_INT,0,0); }
 | STRUCT IDENTIFIER { $$ = process_struct_type($2,0,0); }
 ;
 
-index_or_null : index { $$ = $1; }
-| { $$ = NO_INDEX; }
+index : index const_index { $$ = increase_array_level($1,$2,IS_CONST_INDEX); }
+| index nonconst_index { $$ = increase_array_level($1,$2,IS_CONST_INDEX); }
+| const_index { $$ = $1; }
+| nonconst_index { $$ = $1; }
 ;
 
-index : index INDEX { $$ = increase_array_level($1,$2); }
-| INDEX { $$ = new_array_info($1); }
-;
+nonconst_index : '[' nonconst_right_val ']' { $$ = new_array_info($2,NOT_CONST_INDEX); }
+
+const_index : '[' const_val ']' { $$ = new_array_info($2,IS_CONST_INDEX); }
 
 %%
 
@@ -333,11 +335,6 @@ extern int yylex(void);  /* the lexer */
 
 void yyerror(char* msg) 
 {
-    int tok = yychar;                   /* the last lookahead token code */
-    const char *tname = "UNKNOWN";
-    if (tok >= 0 && tok < YYNTOKENS)    /* YYNTOKENS is generated by Bison */
-        tname = yytname[tok];
-
-    printf("Syntax error at line %d: %s\n", yylineno, msg, tname, yytext);
+    printf("Syntax error at line %d %s: %s\n", yylineno, yytext, msg);
     exit(0);
 }

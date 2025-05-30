@@ -77,10 +77,10 @@
 	 (type_1)->pointer_level == (type_2)->pointer_level)
 #define REF_TO_POINTER(type_1, type_2)                                       \
 	((type_1)->data_type == (type_2)->data_type && (type_1)->is_reference && \
-	 (type_1)->pointer_level == (type_2)->pointer_level - 1)
+	 (type_1)->pointer_level + 1 == (type_2)->pointer_level)
 #define POINTER_TO_REF(type_1, type_2)                                       \
 	((type_1)->data_type == (type_2)->data_type && (type_2)->is_reference && \
-	 (type_1)->pointer_level - 1 == (type_2)->pointer_level)
+	 (type_1)->pointer_level == (type_2)->pointer_level + 1)
 
 // 三地址码类型
 #define TAC_UNDEF -1           // 未定义
@@ -162,7 +162,7 @@
 	   (id2->variable_type->data_type == DATA_CHAR))) &&                  \
 	 (id1->variable_type->pointer_level == id2->variable_type->pointer_level))
 
-#ifdef HJJ_DEBUG
+#ifdef HJJ_TERMINAL
 #define PRINT_3(string, var_1, var_2, var_3) printf(string, var_1, var_2, var_3)
 #define PRINT_2(string, var_1, var_2) printf(string, var_1, var_2)
 #define PRINT_1(string, var_1) printf(string, var_1)
@@ -176,21 +176,25 @@
 #endif
 
 // 符号
+#define NOT_REF 0
+#define IS_REF 1
 struct var_type {
 	int data_type;
 	int pointer_level;
 	int is_reference;
 };
 
+#define NOT_CONST_INDEX 0
+#define IS_CONST_INDEX 1
+#define NOT_DECLARATION 0
+#define MAYBE_DECLARATION 1
 struct arr_info {
 	int max_level;
+	int in_declaration_or_not;
 	int array_offset[MAX];
-	int array_index[MAX];
-};
-
-struct ptr_info {
-	// int temp_deref_count;
-	int has_initialized;
+	int const_or_not[MAX];
+	int const_index[MAX];
+	struct op *nonconst_index[MAX];
 };
 
 struct func_info {
@@ -213,9 +217,16 @@ struct member_def {
 	struct var_type *variable_type;
 
 	struct arr_info *array_info;
-	struct ptr_info pointer_info;
 
 	struct member_def *next_def;
+};
+
+#define NOT_POINTER_FETCH 0
+#define IS_POINTER_FETCH 1
+struct member_ftch {
+	const char *name;
+	int is_pointer_fetch;
+	struct arr_info *index_info;
 };
 
 struct strc_info {
@@ -239,7 +250,6 @@ struct id {
 	struct id *next;
 
 	struct arr_info *array_info;
-	struct ptr_info pointer_info;
 	struct num_info number_info;
 	struct func_info function_info;
 	struct strc_info struct_info;
@@ -260,6 +270,7 @@ struct op {
 	struct tac *code;
 	struct id *addr;
 	struct op *next;  // used in continue and break
+
 	int deref_count;
 };
 
@@ -287,7 +298,7 @@ void reset_table(int direction);
 struct id *find_identifier(const char *name);
 struct id *check_struct_type(int struct_type);
 struct id *check_struct_name(char *name);
-struct member_def *find_member(struct id *instance, char *member_name);
+struct member_def *find_member(struct id *instance, const char *member_name);
 struct id *find_func(const char *name);
 struct member_def *add_member_def_raw(char *name, struct arr_info *array_info);
 struct id *add_identifier(const char *name, int id_type,
@@ -315,7 +326,9 @@ struct block *new_block(struct id *label_begin, struct id *label_end);
 struct var_type *new_var_type(int data_type, int pointer_level,
                               int is_reference);
 struct var_type *new_const_type(int data_type, int pointer_level);
-struct arr_info *new_array_info(int first_level_size);
+struct arr_info *new_array_info(struct op *first_level_exp, int const_or_not);
+struct member_ftch *new_member_fetch(int is_pointer_fetch, char *member_name,
+                                     struct arr_info *index_info);
 
 // 字符串处理
 const char *id_to_str(struct id *id);
@@ -326,6 +339,7 @@ void output_struct(FILE *f, struct id *id_struct);
 void source_to_tac(FILE *f, struct tac *code);
 void input_str(FILE *f, const char *format, ...);
 
-struct arr_info *increase_array_level(struct arr_info *array_info, int size);
-
+struct arr_info *increase_array_level(struct arr_info *array_info,
+                                      struct arr_info *new_info,
+                                      int const_or_not);
 #endif

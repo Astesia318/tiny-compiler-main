@@ -14,12 +14,10 @@ struct op *process_int(int integer);
 struct op *process_float(double floatnum);
 struct op *process_char(char character);
 struct op *process_add_identifier(char *name, struct arr_info *array_info);
-struct op *process_array_identifier(struct op *array_op,
-                                    struct arr_info *index_info);
-struct op *process_identifier(char *name);
-struct op *process_instance_member(char *instance_name, char *member_name);
-struct op *process_pointer_instance_member(char *instance_ptr_name,
-                                           char *member_name);
+struct op *process_identifier(char *name, struct arr_info *index_info);
+struct op *process_instance_member(struct op *instance_op,
+                                   struct member_ftch *member_fetch);
+struct arr_info *process_nonconst_array_info(struct op *array_op);
 struct var_type *process_struct_type(char *name, int pointer_level,
                                      int is_reference);
 

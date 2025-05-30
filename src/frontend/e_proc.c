@@ -102,8 +102,8 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 }
 
 // 处理数组标识符
-struct op *process_array_identifier(struct op *array_op,
-                                    struct arr_info *index_info) {
+static struct op *process_array_identifier(struct op *array_op,
+                                           struct arr_info *index_info) {
 	struct op *id_op = new_op();
 
 	struct id *array = array_op->addr;
@@ -116,7 +116,7 @@ struct op *process_array_identifier(struct op *array_op,
 	}
 
 	if (array_info->max_level < index_info->max_level) {
-		perror("index level too large");
+		perror("index level too high");
 #ifndef HJJ_DEBUG
 		exit(0);
 #endif
@@ -131,32 +131,66 @@ struct op *process_array_identifier(struct op *array_op,
 	cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_1));
 	cat_tac(id_op, NEW_TAC_2(TAC_ASSIGN, t_1, array));
 	for (int cur_level = 0; cur_level <= index_info->max_level; cur_level++) {
-		if (array_info->array_index[cur_level] <
-		    index_info->array_index[cur_level] + 1) {
-			perror("index size too large");
+		if (index_info->const_or_not[cur_level] == IS_CONST_INDEX) {
+			if (array_info->const_index[cur_level] <
+			    index_info->const_index[cur_level] + 1) {
+				perror("index size too large");
 #ifndef HJJ_DEBUG
-			exit(0);
+				exit(0);
 #endif
+			}
+
+			struct id *t_2 =
+			    new_temp(new_var_type(array->variable_type->data_type,
+			                          array->variable_type->pointer_level, 0));
+			struct op *num_op =
+			    process_int(index_info->const_index[cur_level] *
+			                array_info->array_offset[array_info->max_level] /
+			                array_info->array_offset[cur_level] *
+			                TYPE_SIZE(array->variable_type));
+
+			cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_2));
+			cat_tac(id_op, NEW_TAC_3(TAC_PLUS, t_2, t_1, num_op->addr));
+
+			t_1 = t_2;
+			deref_count++;
+		} else {
+			struct op *exp_op = index_info->nonconst_index[cur_level];
+			struct id *index = exp_op->addr;
+			struct id *t_2 =
+			    new_temp(new_var_type(array->variable_type->data_type,
+			                          array->variable_type->pointer_level, 0));
+			struct id *t_inc =
+			    new_temp(new_var_type(index->variable_type->data_type,
+			                          index->variable_type->pointer_level, 0));
+
+			cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_2));
+			cat_op(id_op, exp_op);
+			cat_tac(
+			    id_op,
+			    NEW_TAC_3(TAC_MULTIPLY, t_inc, index,
+			              process_int(TYPE_SIZE(array->variable_type))->addr));
+			cat_tac(id_op, NEW_TAC_3(TAC_PLUS, t_2, t_1, t_inc));
+
+			t_1 = t_2;
+			deref_count++;
 		}
-
-		struct id *t_2 =
-		    new_temp(new_var_type(array->variable_type->data_type,
-		                          array->variable_type->pointer_level, 0));
-		struct op *num_op =
-		    process_int(index_info->array_index[cur_level] *
-		                array_info->array_offset[array_info->max_level] /
-		                array_info->array_offset[cur_level] *
-		                TYPE_SIZE(array->variable_type));
-
-		cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_2));
-		cat_tac(id_op, NEW_TAC_3(TAC_PLUS, t_2, t_1, num_op->addr));
-
-		t_1 = t_2;
-		deref_count++;
 	}
-	// t->pointer_info.temp_deref_count = deref_count;
 	id_op->deref_count = deref_count;
 	id_op->addr = t_1;
+
+	return id_op;
+}
+
+// 处理标识符
+struct op *process_identifier(char *name, struct arr_info *index_info) {
+	struct op *id_op = new_op();
+
+	struct id *var = find_identifier(name);
+	id_op->addr = var;
+	if (index_info != NO_INDEX) {
+		id_op = process_array_identifier(id_op, index_info);
+	}
 
 	return id_op;
 }
@@ -171,66 +205,59 @@ struct op *process_add_identifier(char *name, struct arr_info *array_info) {
 	return id_op;
 }
 
-// 处理标识符
-struct op *process_identifier(char *name) {
-	struct op *id_op = new_op();
+struct op *process_instance_member(struct op *instance_op,
+                                   struct member_ftch *member_fetch) {
+	struct id *instance = instance_op->addr;
+	struct member_def *member = find_member(instance, member_fetch->name);
 
-	struct id *var = find_identifier(name);
-	id_op->addr = var;
+	int member_pointer_level = member->variable_type->pointer_level;
+	int instance_pointer_level = instance->variable_type->pointer_level;
+	int data_type = member->variable_type->data_type;
+	int deref_count = instance_op->deref_count;
+	int is_pointer_fetch = member_fetch->is_pointer_fetch;
+	if (instance_pointer_level - deref_count == 1 && is_pointer_fetch) {
+		struct id *t_member_ref =
+		    new_temp(new_var_type(data_type, member_pointer_level, IS_REF));
+		struct id *t_member_ptr = new_temp(
+		    new_var_type(data_type, member_pointer_level + 1, NOT_REF));
+		t_member_ref->array_info = member->array_info;
+		instance_op->addr = t_member_ref;
 
-	return id_op;
-}
+		cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ref));
+		cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ptr));
+		cat_tac(instance_op,
+		        NEW_TAC_3(TAC_PLUS, t_member_ptr, instance,
+		                  process_int(member->member_offset)->addr));
+		cat_tac(instance_op,
+		        NEW_TAC_2(TAC_VAR_REFER_INIT, t_member_ref, t_member_ptr));
+	} else if (instance_pointer_level - deref_count == 0 && !is_pointer_fetch) {
+		struct id *t_member_ref =
+		    new_temp(new_var_type(data_type, member_pointer_level, IS_REF));
+		struct id *t_member_ptr = new_temp(
+		    new_var_type(data_type, member_pointer_level + 1, NOT_REF));
+		struct id *t_instance_ptr = new_temp(
+		    new_var_type(data_type, instance_pointer_level + 1, NOT_REF));
+		t_member_ref->array_info = member->array_info;
+		instance_op->addr = t_member_ref;
 
-struct op *process_instance_member(char *instance_name, char *member_name) {
-	struct op *instance_op = new_op();
-
-	struct id *instance = find_identifier(instance_name);
-	struct member_def *member = find_member(instance, member_name);
-	struct id *t_member_ref =
-	    new_temp(new_var_type(member->variable_type->data_type,
-	                          member->variable_type->pointer_level, 1));
-	struct id *t_member_ptr =
-	    new_temp(new_var_type(member->variable_type->data_type,
-	                          member->variable_type->pointer_level + 1, 0));
-	struct id *t_instance_ptr =
-	    new_temp(new_var_type(instance->variable_type->data_type,
-	                          instance->variable_type->pointer_level + 1, 0));
-	t_member_ref->array_info = member->array_info;
-	instance_op->addr = t_member_ref;
-
-	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ref));
-	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ptr));
-	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_instance_ptr));
-	cat_tac(instance_op, NEW_TAC_2(TAC_REFER, t_instance_ptr, instance));
-	cat_tac(instance_op, NEW_TAC_3(TAC_PLUS, t_member_ptr, t_instance_ptr,
-	                               process_int(member->member_offset)->addr));
-	cat_tac(instance_op,
-	        NEW_TAC_2(TAC_VAR_REFER_INIT, t_member_ref, t_member_ptr));
-
-	return instance_op;
-}
-
-struct op *process_pointer_instance_member(char *instance_ptr_name,
-                                           char *member_name) {
-	struct op *instance_op = new_op();
-
-	struct id *instance_ptr = find_identifier(instance_ptr_name);
-	struct member_def *member = find_member(instance_ptr, member_name);
-	struct id *t_member_ref =
-	    new_temp(new_var_type(member->variable_type->data_type,
-	                          member->variable_type->pointer_level, 1));
-	struct id *t_member_ptr =
-	    new_temp(new_var_type(member->variable_type->data_type,
-	                          member->variable_type->pointer_level + 1, 0));
-	t_member_ref->array_info = member->array_info;
-	instance_op->addr = t_member_ref;
-
-	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ref));
-	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ptr));
-	cat_tac(instance_op, NEW_TAC_3(TAC_PLUS, t_member_ptr, instance_ptr,
-	                               process_int(member->member_offset)->addr));
-	cat_tac(instance_op,
-	        NEW_TAC_2(TAC_VAR_REFER_INIT, t_member_ref, t_member_ptr));
+		cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ref));
+		cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ptr));
+		cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_instance_ptr));
+		if (instance->variable_type->is_reference) {
+			cat_tac(instance_op, NEW_TAC_2(TAC_ASSIGN, t_instance_ptr, instance));
+		} else {
+			cat_tac(instance_op,
+			        NEW_TAC_2(TAC_REFER, t_instance_ptr, instance));
+		}
+		cat_tac(instance_op,
+		        NEW_TAC_3(TAC_PLUS, t_member_ptr, t_instance_ptr,
+		                  process_int(member->member_offset)->addr));
+		cat_tac(instance_op,
+		        NEW_TAC_2(TAC_VAR_REFER_INIT, t_member_ref, t_member_ptr));
+	}
+	if (member_fetch->index_info)
+		instance_op =
+		    process_array_identifier(instance_op, member_fetch->index_info);
 
 	return instance_op;
 }
@@ -675,11 +702,6 @@ struct op *process_assign(struct op *leftval_op, struct op *exp) {
 		struct op *cast_exp = type_casting(leftval, exp_temp);
 		exp_temp = cast_exp->addr;
 		cat_op(assign_stat, cast_exp);
-		printf("going to cst!\n");
-		printf("leftval name: %s, type: %d!\n", leftval->name,
-		       leftval->variable_type->data_type);
-		printf("exp_temp name: %s, type: %d!\n", exp_temp->name,
-		       exp_temp->variable_type->data_type);
 	}
 	cat_op(assign_stat, leftval_op);
 	if (leftval->variable_type->is_reference) {
@@ -884,6 +906,8 @@ struct op *param_args_type_casting(struct tac *func_param,
 		// 检查参数类型是否匹配
 		if (!TYPE_CHECK(param->id_1, arg->id_1) &&
 		    !REF_TO_CONTENT(param->id_1->variable_type,
+		                    arg->id_1->variable_type) &&
+		    !REF_TO_POINTER(param->id_1->variable_type,
 		                    arg->id_1->variable_type)) {
 			// 如果类型不匹配，进行类型转换
 			struct op *cast_exp = type_casting(param->id_1, arg->id_1);
@@ -892,7 +916,7 @@ struct op *param_args_type_casting(struct tac *func_param,
 
 			arg->id_1 = cast_exp->addr;  // 更新 args_list 中的参数
 		}
-		// 如果实参是引用类型
+		// 如果形参是引用类型
 		else if (REF_TO_CONTENT(param->id_1->variable_type,
 		                        arg->id_1->variable_type)) {
 			struct id *t = new_temp(
@@ -924,6 +948,16 @@ struct op *type_casting(struct id *id_remain, struct id *id_casting) {
 
 	int type_target = id_remain->variable_type->data_type;
 	int type_src = id_casting->variable_type->data_type;
+#ifdef HJJ_DEBUG
+	printf("going to cst!\n");
+	printf("id_remain name: %s, type: %d, pointer level: %d, ref: %d!\n",
+	       id_remain->name, type_target,
+	       id_remain->variable_type->pointer_level,
+	       id_remain->variable_type->is_reference);
+	printf("id_casting name: %s, type: %d, pointer level: %d, ref: %d!\n",
+	       id_casting->name, type_src, id_casting->variable_type->pointer_level,
+	       id_casting->variable_type->is_reference);
+#endif
 
 	struct id *t = new_temp(
 	    new_var_type(type_target, id_remain->variable_type->pointer_level,
