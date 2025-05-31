@@ -51,7 +51,16 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 	cat_tac(exp, NEW_TAC_1(TAC_VAR, t));
 	cat_op(exp, exp_l);  // 拼接exp和exp_l的code
 	cat_op(exp, exp_r);  // 拼接exp和exp_r的code
-
+	if (exp_l->deref_count) {
+		struct op *deref_stat = __deref(exp_l);
+		cat_op(exp, deref_stat);
+		exp_l_addr = deref_stat->addr;
+	}
+	if (exp_r->deref_count) {
+		struct op *deref_stat = __deref(exp_r);
+		cat_op(exp, deref_stat);
+		exp_r_addr = deref_stat->addr;
+	}
 	if (exp_l_addr->variable_type->is_reference) {
 		struct id *tl =
 		    new_temp(new_var_type(exp_l_addr->variable_type->data_type,
@@ -170,7 +179,7 @@ static struct op *process_array_identifier(struct op *array_op,
 			    process_int(index_info->const_index[cur_level] *
 			                array_info->array_offset[array_info->max_level] /
 			                array_info->array_offset[cur_level] *
-			                TYPE_SIZE(array->variable_type, NO_INDEX));
+			                DATA_SIZE(array->variable_type->data_type));
 
 			cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_2));
 			cat_tac(id_op, NEW_TAC_3(TAC_PLUS, t_2, t_1, num_op->addr));
@@ -190,11 +199,11 @@ static struct op *process_array_identifier(struct op *array_op,
 			cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_2));
 			cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_inc));
 			cat_op(id_op, exp_op);
-			cat_tac(
-			    id_op,
-			    NEW_TAC_3(TAC_MULTIPLY, t_inc, index,
-			              process_int(TYPE_SIZE(array->variable_type, NO_INDEX))
-			                  ->addr));
+			cat_tac(id_op,
+			        NEW_TAC_3(
+			            TAC_MULTIPLY, t_inc, index,
+			            process_int(DATA_SIZE(array->variable_type->data_type))
+			                ->addr));
 			cat_tac(id_op, NEW_TAC_3(TAC_PLUS, t_2, t_1, t_inc));
 
 			t_1 = t_2;
@@ -470,7 +479,7 @@ struct member_def *process_definition(struct var_type *variable_type,
 			    cur_definition->array_info->max_level + 1;
 		}
 		cur_definition->member_offset = cur_member_offset;
-		cur_member_offset += TYPE_SIZE(variable_type, NO_INDEX);
+		cur_member_offset += TYPE_SIZE(variable_type,cur_definition->array_info);
 
 		cur_definition = cur_definition->next_def;
 	}

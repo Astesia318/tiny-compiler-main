@@ -127,7 +127,7 @@ void asm_load(int r, struct id *s) {
 int reg_alloc(struct id *s) {
 	int r = reg_get();
 	asm_load(r, s);
-	rdesc_fill(r, s, UNMODIFIED);
+	rdesc_fill(r, s, MODIFIED);
 	return r;
 }
 
@@ -148,9 +148,8 @@ int reg_get() {
 		}
 	}
 	/* random register */
-	srand(time(NULL));
 	r = (rand() % (R_NUM - R_GEN)) + R_GEN;
-	asm_write_back(r);
+	// asm_write_back(r);
 	return r;
 }
 // 寻找符号对应的最晚被修改的寄存器

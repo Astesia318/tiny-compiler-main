@@ -71,13 +71,14 @@ extern const char *args_name[];
 #define HWORD 2
 #define BYTE 1
 
-#define DATA_SIZE(data_type)         \
-	((data_type) == DATA_INT     ? 4 \
-	 : (data_type) == DATA_LONG  ? 4 \
-	 : (data_type) == DATA_FLOAT ? 4 \
-	 : (data_type) == DATA_CHAR  ? 1 \
-	 : (data_type) == DATA_DOUBLE    \
-	     ? 8                         \
+#define DATA_SIZE(data_type)                                       \
+	((data_type) == DATA_INT      ? 4                              \
+	 : (data_type) == DATA_LONG   ? 4                              \
+	 : (data_type) == DATA_FLOAT  ? 4                              \
+	 : (data_type) == DATA_CHAR   ? 1                              \
+	 : (data_type) == DATA_DOUBLE ? 8                              \
+	 : (data_type) >= DATA_STRUCT_INIT                             \
+	     ? check_struct_type(data_type)->struct_info.struct_offset \
 	     : -1) /* 或者返回一个错误码，比如 -1, 或者 ((void)0) 引发编译错误 */
                // XXX:这里认为DATA_UNDEFINED是string
                // hjj:DATA_UNDEFINED改成了DATA_UNDEFINED
@@ -88,10 +89,7 @@ extern const char *args_name[];
 	           DATA_SIZE((variable_type)->data_type)             \
 	 : (variable_type)->pointer_level ? 4                        \
 	 : (variable_type)->is_reference  ? 4                        \
-	 : (variable_type)->data_type >= DATA_STRUCT_INIT            \
-	     ? check_struct_type((variable_type)->data_type)         \
-	           ->struct_info.struct_offset                       \
-	     : DATA_SIZE((variable_type)->data_type))
+	                                  : DATA_SIZE((variable_type)->data_type))
 
 #define TYPE_ALIGN(variable_type)                       \
 	((variable_type)->pointer_level                 ? 2 \
@@ -148,10 +146,10 @@ extern const char *args_name[];
 	 : op == TAC_GE ? a <= b \
 	                : -1)
 
-#define FORMAT_STRING(data_type)      \
-	(data_type == DATA_CHAR    ? "%c" \
-	 : data_type == DATA_FLOAT ? "%f" \
-	 : data_type == DATA_INT   ? "%d" \
+#define FORMAT_STRING(data_type)       \
+	(data_type == DATA_CHAR    ? "%c " \
+	 : data_type == DATA_FLOAT ? "%f " \
+	 : data_type == DATA_INT   ? "%d " \
 	                           : "")
 
 // 函数声明

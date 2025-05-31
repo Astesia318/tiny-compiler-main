@@ -9,10 +9,10 @@ struct teacher {
 };
 
 struct cls {
-	int number;
-	struct student students[30];
-	struct teacher teacher[5];
-	struct teacher *advisor;
+	int number;//4
+	struct student students[30];//30*12
+	struct teacher teacher[5];//5*12
+	struct teacher *advisor;//4
 };
 
 // void init_class(struct cls &clas, int number, struct teacher *advisor) {
@@ -25,28 +25,21 @@ struct cls {
 // 	s.score = score;
 // 	s.name = name;
 // }
-int global;
 
 int main() {
-	// struct cls classes[10];
-	// struct teacher *advisor;
-	int a[40];
-	int i;
-	int x;
-	for (i = 0; i < 40; i = i + 1) {
-		a[i] = i;
+	struct cls classes[10];
+	struct teacher *advisor;
+	char name[20];
+
+	int i, j;
+	for (i = 0; i < 10; i = i + 1) {
+		classes[i].number = i;
+		classes[i].advisor = advisor;
+		for (j = 0; j < 30; j = j + 1) {
+			classes[i].students[j].score = 100;
+			classes[i].students[j].name = name;
+		}
 	}
-	for (i = 0; i < 40; i = i + 1) {
-		x = a[i];
-		output x;
-	}
-	// int i, j;
-	// for (i = 0; i < 10; i = i + 1) {
-	// 	init_class(classes[i], i, advisor);
-	// 	for (j = 0; j < 30; j = j + 1) {
-	// 		init_student(classes[i].students[j], j, 100, name);
-	// 	}
-	// }
 
 	return 0;
 }
