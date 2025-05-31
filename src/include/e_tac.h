@@ -63,12 +63,26 @@
 
 // #define DATA_IS_POINTER(type) ((type >= DATA_PINT) && (type <= DATA_PCHAR))
 // #define DATA_IS_REF(type) ((type >= DATA_RINT) && (type <= DATA_RCHAR))
-#define POINTER_TO_CONTENT(type_1, type_2)         \
-	((type_1)->data_type == (type_2)->data_type && \
-	 (type_1)->pointer_level == (type_2)->pointer_level + 1)
-#define CONTENT_TO_POINTER(type_1, type_2)         \
-	((type_1)->data_type == (type_2)->data_type && \
-	 (type_1)->pointer_level + 1 == (type_2)->pointer_level)
+
+// #define POINTER_TO_CONTENT(type_1, type_2)         \
+// 	((type_1)->data_type == (type_2)->data_type && \
+// 	 (type_1)->pointer_level == (type_2)->pointer_level + 1)
+#define POINTER_TO_CONTENT(type_op_1, type_op_2)         \
+	((type_op_1)->addr->variable_type->data_type ==      \
+	     (type_op_2)->addr->variable_type->data_type &&  \
+	 ((type_op_2)->addr->variable_type->pointer_level == \
+	  (type_op_1)->addr->variable_type->pointer_level -  \
+	      (type_op_1)->deref_count))
+// #define CONTENT_TO_POINTER(type_1, type_2)         \
+// 	((type_1)->data_type == (type_2)->data_type && \
+// 	 (type_1)->pointer_level + 1 == (type_2)->pointer_level)
+#define CONTENT_TO_POINTER(type_op_1, type_op_2)         \
+	((type_op_1)->addr->variable_type->data_type ==      \
+	     (type_op_2)->addr->variable_type->data_type &&  \
+	 ((type_op_1)->addr->variable_type->pointer_level == \
+	  (type_op_2)->addr->variable_type->pointer_level -  \
+	      (type_op_2)->deref_count))
+
 #define REF_TO_CONTENT(type_1, type_2)                                       \
 	((type_1)->data_type == (type_2)->data_type && (type_1)->is_reference && \
 	 (type_1)->pointer_level == (type_2)->pointer_level)

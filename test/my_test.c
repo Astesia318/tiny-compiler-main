@@ -36,7 +36,10 @@ int main() {
 	for (i = 0; i < 40; i = i + 1) {
 		a[i] = i;
 	}
-
+	for (i = 0; i < 40; i = i + 1) {
+		x = a[i];
+		output x;
+	}
 	// int i, j;
 	// for (i = 0; i < 10; i = i + 1) {
 	// 	init_class(classes[i], i, advisor);

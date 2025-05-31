@@ -155,7 +155,7 @@ extern const char *args_name[];
 	                           : "")
 
 // 函数声明
-void rdesc_clear_all(int r);
+void rdesc_clear_all();
 void rdesc_clear_prev(int r);
 void rdesc_clear_temp(int r);
 void rdesc_fill(int r, struct id *s, int mod);

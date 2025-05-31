@@ -17,9 +17,9 @@ const char *reg_name[] = {
     "t0",  "t1", "t2", "t3", "t4", "t5", "t6",  // 可分配的
     "zero"};
 const char *args_name[] = {"a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7"};
-// 清除某变量对应的所有寄存器描述符
-// 由于reg_alloc不只是在bin和cmp里使用，所以不能删去clear_al
-void rdesc_clear_all(int r) {
+
+// 清除某变量对应的所有非最新的寄存器描述符
+void rdesc_clear_prev(int r) {
 	rdesc[r].var = NULL;
 	rdesc[r].mod = 0;
 	rdesc[r].next = NULL;
@@ -29,16 +29,13 @@ void rdesc_clear_all(int r) {
 		rdesc_clear_all(pre);
 	}
 }
-
-// 清除某变量对应的所有非最新的寄存器描述符
-void rdesc_clear_prev(int r) {
-	if (rdesc[r].prev != NULL) {
-		int pre = RDESC_NUM(rdesc[r].prev);
-		rdesc[r].prev = NULL;
-		rdesc_clear_all(pre);
+// 清空寄存器描述符
+// 由于reg_alloc不只是在bin和cmp里使用，所以不能删去clear_al
+void rdesc_clear_all() {
+	for (int i = R_GEN; i < R_NUM; i++) {
+		rdesc_clear_prev(i);
 	}
 }
-
 // 清除临时的寄存器描述符
 void rdesc_clear_temp(int r) {
 	rdesc[r].var = NULL;
@@ -172,19 +169,21 @@ int reg_find(struct id *s) {
 }
 
 void asm_load_var(struct id *s, const char *r) {
-	if (ID_IS_GCONST(s->id_type, s->variable_type->data_type)) {  // XXX:不知道适不适配string
+	if (ID_IS_GCONST(
+	        s->id_type,
+	        s->variable_type->data_type)) {    // XXX:不知道适不适配string
 		U_TYPE_UPPER_SYM("lla", r, s->label);  // 使用 U_TYPE_UPPER_IMM 宏
-		I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->variable_type,NO_INDEX)), r, r, 0);
+		I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r, r, 0);
 	} else if (ID_IS_INTCONST(s->id_type, s->variable_type->data_type)) {
 		U_TYPE_UPPER_IMM("li", r,
 		                 s->number_info.num);  // 使用 U_TYPE_UPPER_IMM 宏
 	} else {                                   // TEMP or VAR
 		if (s->scope == GLOBAL_TABLE) {
 			U_TYPE_UPPER_SYM("la", r, s->name);  // 使用 U_TYPE_UPPER_IMM 宏
-			I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->variable_type,NO_INDEX)), r, r,
+			I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r, r,
 			            0);  // 使用 I_TYPE_LOAD 宏
 		} else {
-			I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->variable_type,NO_INDEX)), r, "s0",
+			I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r, "s0",
 			            s->offset);  // 使用 I_TYPE_LOAD 宏
 		}
 	}
@@ -195,10 +194,11 @@ void asm_store_var(struct id *s, const char *r) {
 		int addr_reg = reg_get();
 		U_TYPE_UPPER_SYM("la", reg_name[addr_reg],
 		                 s->name);  // 使用 U_TYPE_UPPER_IMM 宏
-		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->variable_type,NO_INDEX)), r, reg_name[addr_reg],
+		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r,
+		             reg_name[addr_reg],
 		             0);  // 使用 S_TYPE_STORE 宏
 	} else {
-		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->variable_type,NO_INDEX)), r, "s0",
+		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r, "s0",
 		             s->offset);  // 使用 S_TYPE_STORE 宏
 	}
 }

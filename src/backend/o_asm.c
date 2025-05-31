@@ -223,11 +223,11 @@ void asm_stack_pivot(struct tac *code) {
 	struct tac *cur;
 	for (cur = code; cur != NULL; cur = cur->next) {
 		if (cur->type == TAC_VAR) {
-			var_size +=
-			    ALIGN(TYPE_SIZE(cur->id_1->variable_type,cur->id_1->array_info));
+			var_size += ALIGN(
+			    TYPE_SIZE(cur->id_1->variable_type, cur->id_1->array_info));
 		} else if (cur->type == TAC_PARAM) {
-			param_size +=
-			    ALIGN(TYPE_SIZE(cur->id_1->variable_type,cur->id_1->array_info));
+			param_size += ALIGN(
+			    TYPE_SIZE(cur->id_1->variable_type, cur->id_1->array_info));
 		} else if (cur->type == TAC_END) {
 			break;
 		}
@@ -342,6 +342,7 @@ void asm_input(struct id *a) {
 	                         ID_STRING, new_const_type(DATA_UNDEFINED, 0));
 	U_TYPE_UPPER_SYM("lla", reg_name[R_a0], format->label);
 	J_TYPE_JUMP_PSEUDO("call", "scanf");
+	rdesc_clear_all();  // 调用内置函数后需要清空寄存器描述符
 }
 
 void asm_output(struct id *a) {
@@ -358,4 +359,5 @@ void asm_output(struct id *a) {
 		asm_load_var(a, reg_name[R_a0]);
 	}
 	J_TYPE_JUMP_PSEUDO("call", "printf");
+	rdesc_clear_all();  // 调用内置函数后需要清空寄存器描述符
 }
