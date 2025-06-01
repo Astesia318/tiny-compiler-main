@@ -243,7 +243,6 @@ struct op *process_add_identifier(char *name, struct arr_info *array_info) {
 //                                    struct member_ftch *member_fetch) {
 // 	struct id *instance = instance_op->addr;
 // 	struct member_def *member = find_member(instance, member_fetch->name);
-
 // 	int member_pointer_level = member->variable_type->pointer_level;
 // 	int instance_pointer_level = instance->variable_type->pointer_level;
 // 	int data_type = member->variable_type->data_type;
@@ -256,7 +255,6 @@ struct op *process_add_identifier(char *name, struct arr_info *array_info) {
 // 		    new_var_type(data_type, member_pointer_level + 1, NOT_REF));
 // 		t_member_ref->array_info = member->array_info;
 // 		instance_op->addr = t_member_ref;
-
 // 		cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ref));
 // 		cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ptr));
 // 		cat_tac(instance_op,
@@ -273,7 +271,6 @@ struct op *process_add_identifier(char *name, struct arr_info *array_info) {
 // 		    new_var_type(data_type, instance_pointer_level + 1, NOT_REF));
 // 		t_member_ref->array_info = member->array_info;
 // 		instance_op->addr = t_member_ref;
-
 // 		cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ref));
 // 		cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ptr));
 // 		cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_instance_ptr));
@@ -293,9 +290,9 @@ struct op *process_add_identifier(char *name, struct arr_info *array_info) {
 // 	if (member_fetch->index_info)
 // 		instance_op =
 // 		    process_array_identifier(instance_op, member_fetch->index_info);
-
 // 	return instance_op;
 // }
+
 // lyc:
 struct op *process_instance_member(struct op *instance_op,
                                    struct member_ftch *member_fetch) {
@@ -304,24 +301,26 @@ struct op *process_instance_member(struct op *instance_op,
 
 	int member_pointer_level = member->variable_type->pointer_level;
 	int instance_pointer_level = instance->variable_type->pointer_level;
-	int data_type = member->variable_type->data_type;
+	int member_data_type = member->variable_type->data_type;
+	int instance_data_type = instance->variable_type->data_type;
 	int deref_count = instance_op->deref_count;
 	if (member_fetch->is_pointer_fetch && instance_pointer_level == 0) {
 		perror("Can't apply '->' to a non-pointer");
 	}
 	int is_pointer_fetch =
 	    member_fetch->is_pointer_fetch || instance_pointer_level;
+	int is_ref = instance->variable_type->is_reference;
 	struct arr_info *member_index = member_fetch->index_info;
 
 	struct id *t_member_ptr = new_temp(
-	    new_var_type(data_type, member_pointer_level + (member_index == NULL),
+	    new_var_type(member_data_type, member_pointer_level + (member_index == NULL),
 	                 NOT_REF));  // member_addr
 	struct id *t_instance_ptr = new_temp(
-	    new_var_type(data_type, instance_pointer_level + !is_pointer_fetch,
+	    new_var_type(instance_data_type, instance_pointer_level + !is_pointer_fetch,
 	                 NOT_REF));  // base_addr
 	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ptr));
 	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_instance_ptr));
-	cat_tac(instance_op, NEW_TAC_2(is_pointer_fetch ? TAC_ASSIGN : TAC_REFER,
+	cat_tac(instance_op, NEW_TAC_2(is_pointer_fetch||is_ref ? TAC_ASSIGN : TAC_REFER,
 	                               t_instance_ptr, instance));
 	cat_tac(instance_op, NEW_TAC_3(TAC_PLUS, t_member_ptr, t_instance_ptr,
 	                               process_int(member->member_offset)->addr));
@@ -709,6 +708,9 @@ struct op *process_call(char *name, struct op *arg_list) {
 	cat_op(call_stat, cast_arg_list);
 	if (func->variable_type->data_type != DATA_VOID) {
 		cat_tac(call_stat, NEW_TAC_2(TAC_CALL, t, func));
+	}
+	else {
+		cat_tac(call_stat, NEW_TAC_2(TAC_CALL, NULL,func));
 	}
 
 	return call_stat;

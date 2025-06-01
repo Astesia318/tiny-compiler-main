@@ -117,7 +117,7 @@ void asm_code(struct tac *code) {
 			return;
 
 		case TAC_END:
-			// asm_return(NULL);
+			asm_stack_restore();
 			scope = GLOBAL_TABLE;
 			return;
 

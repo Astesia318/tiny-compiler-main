@@ -562,7 +562,7 @@ void output_tac(FILE *f, struct tac *code) {
 
 		case TAC_CALL:
 			if (id_1 == NULL)
-				PRINT_1("call %s\n", (char *)id_2);
+				PRINT_1("call %s\n", id_2->name);
 			else
 				PRINT_2("%s = call %s\n", id_to_str(id_1), id_to_str(id_2));
 			break;

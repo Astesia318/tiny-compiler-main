@@ -20,6 +20,7 @@ void asm_refer(struct id *pointer, struct id *var_pointed);
 void asm_derefer_get(struct id *var, struct id *pointer);
 void asm_derefer_put(struct id *var, struct id *pointer);
 void asm_stack_pivot(struct tac *code);
+void asm_stack_restore();
 void asm_call(struct tac *code, struct id *a, struct id *b);
 void asm_param(struct tac *code);
 void asm_return(struct id *a);

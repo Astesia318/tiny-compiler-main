@@ -27,19 +27,12 @@ struct cls {
 // }
 
 int main() {
-	struct cls classes[4];
-	struct teacher *advisor;
-	char name[20];
-
 	int i, j;
-	for (i = 0; i < 4; i = i + 1) {
-		classes[i].number = i;
-		classes[i].advisor = advisor;
-		for (j = 0; j < 2; j = j + 1) {
-			classes[i].students[j].score = 100;
-			classes[i].students[j].name = name;
+	for (i = 0; i < 10; i = i + 1) {
+		for (j = 0; j < 20; j = j + 1) {
+			continue;
+			int x = 10;
 		}
 	}
-
 	return 0;
 }

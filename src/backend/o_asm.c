@@ -176,13 +176,13 @@ void asm_cmp(int op, struct id *a, struct id *b, struct id *c) {
 	}
 }
 
-void asm_assign(struct id*a,struct id*b){
+void asm_assign(struct id *a, struct id *b) {
 	int r = reg_find(b);
 	if (a->variable_type->data_type == b->variable_type->data_type) {
 		rdesc_fill(r, a,
 		           MODIFIED);  // 只有类型相同时覆盖寄存器描述符，防止未截断错误
 	}
-	
+
 	asm_store_var(a, reg_name[r]);
 }
 
@@ -247,17 +247,28 @@ void asm_stack_pivot(struct tac *code) {
 	oon = var_size + param_size + 16;
 	tof = LOCAL_OFF;
 	oof = FORMAL_OFF - var_size;
+	if(oon>4096){
+		perror("Stack out of memory!");
+	}
 	input_str(obj_file, "	addi sp,sp,-%d\n", oon);
 	input_str(obj_file, "	sw ra,%d(sp)\n", oon - 4);
 	input_str(obj_file, "	sw s0,%d(sp)\n", oon - 8);
 	input_str(obj_file, "	addi s0,sp,%d\n", oon);
 }
+
+void asm_stack_restore() {
+	input_str(obj_file, "	lw ra,%d(sp)\n", oon - 4);
+	input_str(obj_file, "	lw s0,%d(sp)\n", oon - 8);
+	input_str(obj_file, "	addi sp,sp,%d\n", oon);
+	input_str(obj_file, "	jr ra\n");
+}
+
 void asm_param(struct tac *code) {
 	int cnt = 0;
 	struct tac *cur = code->next;
 	int data_size;
 	while (cur->type == TAC_PARAM) {
-		LOCAL_VAR_OFFSET(cur->id_1, oof, code->id_1->array_info);
+		LOCAL_VAR_OFFSET(cur->id_1, oof, cur->id_1->array_info);
 		// TODO:
 		asm_store_var(cur->id_1, args_name[cnt]);
 		cur = cur->next;
@@ -326,11 +337,6 @@ void asm_return(struct id *a) {
 		int r = reg_find(a);
 		input_str(obj_file, "	mv %s,%s\n", reg_name[R_a0], reg_name[r]);
 	}
-
-	input_str(obj_file, "	lw ra,%d(sp)\n", oon - 4);
-	input_str(obj_file, "	lw s0,%d(sp)\n", oon - 8);
-	input_str(obj_file, "	addi sp,sp,%d\n", oon);
-	input_str(obj_file, "	jr ra\n");
 }
 
 void asm_input(struct id *a) {
