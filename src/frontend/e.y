@@ -62,6 +62,7 @@ void yyerror(char* msg);
 %type <operation> statement_block
 %type <operation> declaration_list
 %type <operation> declaration
+%type <operation> struct_head
 %type <operation> struct_definition
 %type <definition> definition_block
 %type <definition> definition_list
@@ -139,7 +140,8 @@ parameter_list : complex_type IDENTIFIER { reset_table(INTO_LOCAL_TABLE); $$ = p
 /**************************************/
 /**************** stat ****************/
 /**************************************/
-struct_definition : STRUCT IDENTIFIER definition_block { $$ = process_struct_definition($2,$3); }
+struct_head : STRUCT IDENTIFIER {$$ = process_struct_head($2);}
+struct_definition : struct_head definition_block { $$ = process_struct_definition($1,$2); }
 
 definition_block : '{' definition_list '}' ';' { $$ = $2; }
 

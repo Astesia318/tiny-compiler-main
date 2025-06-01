@@ -20,8 +20,8 @@ struct op *process_instance_member(struct op *instance_op,
 struct arr_info *process_nonconst_array_info(struct op *array_op);
 struct var_type *process_struct_type(char *name, int pointer_level,
                                      int is_reference);
-
-struct op *process_struct_definition(char *name,
+struct op *process_struct_head(char *name);
+struct op *process_struct_definition(struct op *struct_head,
                                      struct member_def *definition_block);
 struct member_def *process_definition(struct var_type *variable_type,
                                       struct member_def *member_list);

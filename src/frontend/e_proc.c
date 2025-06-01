@@ -21,7 +21,7 @@ struct op *__deref(struct op *exp) {
 		exit(0);
 #endif
 	}
-	while (exp->deref_count--) {
+	while (exp->deref_count) {
 		struct id *t_2 =
 		    new_temp(new_var_type(t_1->variable_type->data_type,
 		                          t_1->variable_type->pointer_level - 1,
@@ -29,6 +29,7 @@ struct op *__deref(struct op *exp) {
 		cat_tac(deref_stat, NEW_TAC_1(TAC_VAR, t_2));
 		cat_tac(deref_stat, NEW_TAC_2(TAC_DEREFER_GET, t_2, t_1));
 		t_1 = t_2;
+		exp->deref_count--;
 	}
 	deref_stat->addr = t_1;
 	return deref_stat;
@@ -312,16 +313,17 @@ struct op *process_instance_member(struct op *instance_op,
 	int is_ref = instance->variable_type->is_reference;
 	struct arr_info *member_index = member_fetch->index_info;
 
-	struct id *t_member_ptr = new_temp(
-	    new_var_type(member_data_type, member_pointer_level + (member_index == NULL),
-	                 NOT_REF));  // member_addr
-	struct id *t_instance_ptr = new_temp(
-	    new_var_type(instance_data_type, instance_pointer_level + !is_pointer_fetch,
-	                 NOT_REF));  // base_addr
+	struct id *t_member_ptr = new_temp(new_var_type(
+	    member_data_type, member_pointer_level + (member_index == NULL),
+	    NOT_REF));  // member_addr
+	struct id *t_instance_ptr = new_temp(new_var_type(
+	    instance_data_type, instance_pointer_level + !is_pointer_fetch,
+	    NOT_REF));  // base_addr
 	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ptr));
 	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_instance_ptr));
-	cat_tac(instance_op, NEW_TAC_2(is_pointer_fetch||is_ref ? TAC_ASSIGN : TAC_REFER,
-	                               t_instance_ptr, instance));
+	cat_tac(instance_op,
+	        NEW_TAC_2(is_pointer_fetch || is_ref ? TAC_ASSIGN : TAC_REFER,
+	                  t_instance_ptr, instance));
 	cat_tac(instance_op, NEW_TAC_3(TAC_PLUS, t_member_ptr, t_instance_ptr,
 	                               process_int(member->member_offset)->addr));
 	instance_op->deref_count = 1;
@@ -491,20 +493,26 @@ struct var_type *process_struct_type(char *name, int pointer_level,
 /************* statement **************/
 /**************************************/
 // 可以考虑用注释形式放到三地址文件？
-struct op *process_struct_definition(char *name,
-                                     struct member_def *definition_block) {
+struct op *process_struct_head(char *name) {
 	struct op *struct_op = new_op();
 	static int cur_struct_type = DATA_STRUCT_INIT;
 
 	struct id *new_struct = add_identifier(name, ID_STRUCT, NO_TYPE, NO_INDEX);
-	new_struct->struct_info.definition_list = definition_block;
 	new_struct->struct_info.next_struct = struct_table;
 	new_struct->struct_info.struct_type = cur_struct_type++;
-	new_struct->struct_info.struct_offset = cur_member_offset;
 	struct_table = new_struct;
 	cur_member_offset = 0;
-
+	struct_op->addr = new_struct;
 	return struct_op;
+}
+
+struct op *process_struct_definition(struct op *struct_head,
+                                     struct member_def *definition_block) {
+	struct id *new_struct = struct_head->addr;
+	new_struct->struct_info.definition_list = definition_block;
+	new_struct->struct_info.struct_offset = cur_member_offset;
+
+	return struct_head;
 }
 
 struct member_def *process_definition(struct var_type *variable_type,
@@ -708,9 +716,8 @@ struct op *process_call(char *name, struct op *arg_list) {
 	cat_op(call_stat, cast_arg_list);
 	if (func->variable_type->data_type != DATA_VOID) {
 		cat_tac(call_stat, NEW_TAC_2(TAC_CALL, t, func));
-	}
-	else {
-		cat_tac(call_stat, NEW_TAC_2(TAC_CALL, NULL,func));
+	} else {
+		cat_tac(call_stat, NEW_TAC_2(TAC_CALL, NULL, func));
 	}
 
 	return call_stat;
@@ -788,21 +795,29 @@ struct op *process_assign(struct op *leftval_op, struct op *exp) {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_PUT, leftval, exp_temp));
 	} else if (exp_temp->variable_type->is_reference) {
 		cat_tac(assign_stat, NEW_TAC_2(TAC_DEREFER_GET, leftval, exp_temp));
-	} else if (leftval_op->deref_count) {
-		leftval_op
-		    ->deref_count--;  // 对于左值需要少解一次引用，因为使用DEREFER_PUT
-		struct op *deref_stat = __deref(leftval_op);
-		cat_op(assign_stat, deref_stat);
-		cat_tac(assign_stat,
-		        NEW_TAC_2(TAC_DEREFER_PUT, deref_stat->addr, exp_temp));
-	} else if (exp->deref_count) {
-		struct op *deref_stat = __deref(exp);
-		cat_op(assign_stat, deref_stat);
-		cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, leftval, deref_stat->addr));
 	} else {
-		cat_tac(assign_stat, NEW_TAC_2(TAC_ASSIGN, leftval, exp_temp));
-	}
+		struct op *exp_deref_stat = new_op();
+		exp_deref_stat->addr = exp_temp;
+		if (exp->deref_count &&  // 当左值需要地址，右值也是地址时才不需要解引用
+		    (leftval->variable_type->pointer_level - leftval_op->deref_count ==
+		     exp_temp->variable_type->pointer_level - exp->deref_count)) {
+			exp_deref_stat = __deref(exp);
+			cat_op(assign_stat, exp_deref_stat);
+		}
+		if (leftval_op->deref_count) {
+			// 对于左值需要少解一次引用，因为使用DEREFER_PUT
+			leftval_op->deref_count--;
+			struct op *left_deref_stat = __deref(leftval_op);
 
+			cat_op(assign_stat, left_deref_stat);
+
+			cat_tac(assign_stat,
+			        NEW_TAC_2(TAC_DEREFER_PUT, left_deref_stat->addr,
+			                  exp_deref_stat->addr));
+		} else
+			cat_tac(assign_stat,
+			        NEW_TAC_2(TAC_ASSIGN, leftval, exp_deref_stat->addr));
+	}
 	return assign_stat;
 }
 
@@ -872,12 +887,14 @@ struct op *process_derefer_get(struct op *id_op) {
 
 	return __deref(id_op);
 }
-
-// 处理指针对变量的引用
+// cur=t19 一级指针，
+//  处理指针对变量的引用
 struct op *process_reference(struct op *id_op) {
-	struct op *pointer_stat = new_op();
-
 	struct id *var = id_op->addr;
+	if (id_op->deref_count) {
+		return id_op;
+	}
+	struct op *pointer_stat = new_op();
 
 	struct id *t =
 	    new_temp(new_var_type(var->variable_type->data_type,
