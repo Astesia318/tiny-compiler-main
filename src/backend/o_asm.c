@@ -176,6 +176,16 @@ void asm_cmp(int op, struct id *a, struct id *b, struct id *c) {
 	}
 }
 
+void asm_assign(struct id*a,struct id*b){
+	int r = reg_find(b);
+	if (a->variable_type->data_type == b->variable_type->data_type) {
+		rdesc_fill(r, a,
+		           MODIFIED);  // 只有类型相同时覆盖寄存器描述符，防止未截断错误
+	}
+	
+	asm_store_var(a, reg_name[r]);
+}
+
 // 生成条件跳转(ifz)对应的汇编代码
 void asm_cond(char *op, struct id *a, const char *l) {
 	// for (int r = R_GEN; r < R_NUM; r++) asm_write_back(r);

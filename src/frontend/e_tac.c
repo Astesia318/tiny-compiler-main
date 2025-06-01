@@ -452,13 +452,13 @@ const char *data_to_str(struct var_type *variable_type,
 				break;
 		}
 	}
-	if (array_info == NO_INDEX) {
-		int cur_pointer = 0;
-		while (cur_pointer != variable_type->pointer_level) {
-			strcat(buf, "*");
-			cur_pointer++;
-		}
+	// 要考虑指针数组，数组类型要少输出一次*
+	int cur_pointer = (array_info != NO_INDEX);
+	while (cur_pointer < variable_type->pointer_level) {
+		strcat(buf, "*");
+		cur_pointer++;
 	}
+
 	if (variable_type->is_reference) {
 		strcat(buf, "&");
 	}

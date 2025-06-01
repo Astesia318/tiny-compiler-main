@@ -55,14 +55,11 @@ void asm_code(struct tac *code) {
 
 		case TAC_ASSIGN:
 		case TAC_VAR_REFER_INIT:
-			r = reg_find(id_2);
-			if (id_1->variable_type->data_type ==
-			    id_2->variable_type->data_type) {
-				rdesc_fill(
-				    r, id_1,
-				    MODIFIED);  // 只有类型相同时覆盖寄存器描述符，防止未截断错误
+			if (id_2->array_info == NO_INDEX) {
+				asm_assign(id_1, id_2);
+			} else {
+				asm_refer(id_1, id_2);
 			}
-			asm_store_var(id_1, reg_name[r]);
 			return;
 
 		case TAC_INPUT:
