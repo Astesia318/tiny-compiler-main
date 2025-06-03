@@ -314,11 +314,9 @@ extern int cur_member_offset;
 void reset_table(int direction);
 // void clear_table(int scope);
 struct id *find_identifier(const char *name);
-struct id *check_struct_type(int struct_type);
-struct id *check_struct_name(char *name);
-struct member_def *find_member(struct id *instance, const char *member_name);
+
 struct id *find_func(const char *name);
-struct member_def *add_member_def_raw(char *name, struct arr_info *array_info);
+
 struct id *add_identifier(const char *name, int id_type,
                           struct var_type *variable_type,
                           struct arr_info *array_info);
@@ -331,8 +329,6 @@ void cat_tac(struct op *dest, struct tac *src);
 void cat_op(struct op *dest, struct op *src);             // 会释放src
 struct op *cat_list(struct op *exp_1, struct op *exp_2);  // 会释放exp_2
 struct op *cpy_op(struct op *src);
-struct member_def *cat_def(struct member_def *list_1,
-                           struct member_def *list_2);
 
 // 初始化
 struct op *new_op();
@@ -341,12 +337,6 @@ struct tac *new_tac(int type, struct id *id_1, struct id *id_2,
 struct id *new_temp(struct var_type *variable_type);
 struct id *new_label();
 struct block *new_block(struct id *label_begin, struct id *label_end);
-struct var_type *new_var_type(int data_type, int pointer_level,
-                              int is_reference);
-struct var_type *new_const_type(int data_type, int pointer_level);
-struct arr_info *new_array_info(struct op *first_level_exp, int const_or_not);
-struct member_ftch *new_member_fetch(int is_pointer_fetch, char *member_name,
-                                     struct arr_info *index_info);
 
 // 字符串处理
 const char *id_to_str(struct id *id);
@@ -357,7 +347,4 @@ void output_struct(FILE *f, struct id *id_struct);
 void source_to_tac(FILE *f, struct tac *code);
 void input_str(FILE *f, const char *format, ...);
 
-struct arr_info *increase_array_level(struct arr_info *array_info,
-                                      struct arr_info *new_info,
-                                      int const_or_not);
 #endif

@@ -44,6 +44,9 @@
 #include <stdio.h>
 
 #include "e_tac.h"
+#include "e_internal.h"
+#include "e_custom.h"
+
 
 // 寄存器描述符结构
 struct rdesc {
@@ -157,10 +160,8 @@ void rdesc_clear_all();
 void rdesc_clear_prev(int r);
 void rdesc_clear_temp(int r);
 void rdesc_fill(int r, struct id *s, int mod);
-void asm_write_back(int r);
 void asm_load(int r, struct id *s);
-void asm_load_var(struct id *a, const char *reg);   // sw reg &a
-void asm_store_var(struct id *a, const char *reg);  // sw reg &a
+
 int reg_find(struct id *s);
 int reg_alloc(struct id *s);
 int reg_get();

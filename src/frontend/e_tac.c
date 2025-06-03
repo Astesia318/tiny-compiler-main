@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "e_internal.h"
+#include "e_custom.h"
+
 int scope;
 char temp_buf[256];
 struct id *id_global, *id_local;
@@ -115,52 +118,6 @@ struct id *find_func(const char *name) {
 	                        CHECK_ID_EXIST);
 }
 
-struct id *check_struct_type(int struct_type) {
-	struct id *cur_struct = struct_table;
-	while (cur_struct) {
-		if (cur_struct->struct_info.struct_type == struct_type) {
-			return cur_struct;
-		}
-		cur_struct = cur_struct->next;
-	}
-	perror("no struct found");
-#ifndef HJJ_DEBUG
-	exit(0);
-#endif
-	return NULL;
-}
-
-struct id *check_struct_name(char *name) {
-	struct id *cur_struct = struct_table;
-	while (cur_struct) {
-		if (!strcmp(cur_struct->name, name)) {
-			return cur_struct;
-		}
-		cur_struct = cur_struct->next;
-	}
-	perror("no struct found");
-#ifndef HJJ_DEBUG
-	exit(0);
-#endif
-	return NULL;
-}
-
-struct member_def *find_member(struct id *instance, const char *member_name) {
-	struct id *struct_def =
-	    check_struct_type(instance->variable_type->data_type);
-	struct member_def *cur_member_def = struct_def->struct_info.definition_list;
-	while (cur_member_def) {
-		if (!strcmp(cur_member_def->name, member_name)) {
-			return cur_member_def;
-		}
-		cur_member_def = cur_member_def->next_def;
-	}
-	perror("no member found");
-#ifndef HJJ_DEBUG
-	exit(0);
-#endif
-	return NULL;
-}
 
 struct id *add_identifier(const char *name, int id_type,
                           struct var_type *variable_type,
@@ -168,7 +125,7 @@ struct id *add_identifier(const char *name, int id_type,
 	// lyc:对于text float double类型常量将其放到全局表里
 	// hjj: so as function and struct...原因是类型转换时会添加func,
 	// 这个func应当到global table。 hjj: 不过到层次结构可能会改变
-	// lyc: 说得对，但是还是改回去GCONST了，使用GLOBAL代替
+	// lyc: 说得对，使用GLOBAL代替了，GCONST改回去了
 	if (ID_IS_GLOBAL(id_type))
 		return _add_identifier(name, id_type, variable_type,
 		                       _choose_id_table(GLOBAL_TABLE), array_info);
@@ -182,17 +139,6 @@ struct id *add_const_identifier(const char *name, int id_type,
 	return add_identifier(name, id_type, variable_type, NO_INDEX);
 }
 
-struct member_def *add_member_def_raw(char *name, struct arr_info *array_info) {
-	struct member_def *new_def;
-
-	MALLOC_AND_SET_ZERO(new_def, 1, struct member_def);
-	char *member_name = (char *)malloc(sizeof(char) * strlen(name));
-	strcpy(member_name, name);
-	new_def->name = member_name;
-	new_def->array_info = array_info;
-
-	return new_def;
-}
 
 void init_tac() {
 	scope = GLOBAL_TABLE;
@@ -255,15 +201,6 @@ struct op *cat_list(struct op *exp_1, struct op *exp_2) {
 // 目前来看，并不需要复制再释放的操作，只需要把指针本身复制给dest
 struct op *cpy_op(struct op *src) { return src; }
 
-struct member_def *cat_def(struct member_def *list_1,
-                           struct member_def *list_2) {
-	struct member_def *cur_def = list_1;
-	while (cur_def->next_def) {
-		cur_def = cur_def->next_def;
-	}
-	cur_def->next_def = list_2;
-	return list_1;
-}
 
 struct op *new_op() {
 	struct op *nop;
@@ -307,68 +244,6 @@ struct block *new_block(struct id *l_begin, struct id *l_end) {
 	return nstack;
 }
 
-struct var_type *new_var_type(int data_type, int pointer_level,
-                              int is_reference) {
-	struct var_type *new_type;
-	MALLOC_AND_SET_ZERO(new_type, 1, struct var_type);
-	new_type->data_type = data_type;
-	new_type->pointer_level = pointer_level;
-	new_type->is_reference = is_reference;
-	return new_type;
-}
-
-struct var_type *new_const_type(int data_type, int pointer_level) {
-	return new_var_type(data_type, pointer_level, 0);
-}
-
-struct arr_info *increase_array_level(struct arr_info *array_info,
-                                      struct arr_info *new_info,
-                                      int const_or_not) {
-	array_info->max_level += 1;
-	int cur_level = array_info->max_level;
-	if (const_or_not == IS_CONST_INDEX) {
-		int size = new_info->const_index[0];
-		array_info->const_or_not[cur_level] = IS_CONST_INDEX;
-		array_info->const_index[cur_level] = size;
-		array_info->array_offset[cur_level] *= size;
-	} else {
-		struct op *exp = new_info->nonconst_index[0];
-		array_info->const_or_not[cur_level] = NOT_CONST_INDEX;
-		array_info->nonconst_index[cur_level] = exp;
-		array_info->in_declaration_or_not = NOT_DECLARATION;
-	}
-	return array_info;
-}
-
-struct arr_info *new_array_info(struct op *first_exp, int const_or_not) {
-	struct arr_info *new_info;
-	MALLOC_AND_SET_ZERO(new_info, 1, struct arr_info);
-	new_info->max_level = 0;
-	new_info->in_declaration_or_not = MAYBE_DECLARATION;
-	if (const_or_not == IS_CONST_INDEX) {
-		int first_size = first_exp->addr->number_info.num.num_int;
-		new_info->const_or_not[0] = IS_CONST_INDEX;
-		new_info->const_index[0] = first_size;
-		new_info->array_offset[0] = first_size;
-	} else {
-		new_info->const_or_not[0] = NOT_CONST_INDEX;
-		new_info->nonconst_index[0] = first_exp;
-		new_info->in_declaration_or_not = NOT_DECLARATION;
-	}
-	return new_info;
-}
-
-struct member_ftch *new_member_fetch(int is_pointer_fetch, char *name,
-                                     struct arr_info *index_info) {
-	struct member_ftch *new_fetch;
-	MALLOC_AND_SET_ZERO(new_fetch, 1, struct member_ftch);
-	char *member_name = (char *)malloc(sizeof(char) * strlen(name));
-	strcpy(member_name, name);
-	new_fetch->name = member_name;
-	new_fetch->is_pointer_fetch = is_pointer_fetch;
-	new_fetch->index_info = index_info;
-	return new_fetch;
-}
 
 const char *id_to_str(struct id *id) {
 	if (id == NULL) return "NULL";
@@ -393,31 +268,6 @@ const char *id_to_str(struct id *id) {
 	}
 }
 
-void output_struct(FILE *f, struct id *id_struct) {
-	PRINT_1("struct %s\n", id_struct->name);
-	struct member_def *cur_definition = id_struct->struct_info.definition_list;
-	while (cur_definition) {
-		if (cur_definition->array_info == NO_INDEX) {
-			PRINT_2("member %s %s",
-			        data_to_str(cur_definition->variable_type,
-			                    cur_definition->array_info),
-			        cur_definition->name);
-		} else {
-			PRINT_2("member %s %s",
-			        data_to_str(cur_definition->variable_type,
-			                    cur_definition->array_info),
-			        cur_definition->name);
-			for (int cur_level = 0;
-			     cur_level <= cur_definition->array_info->max_level;
-			     cur_level++) {
-				PRINT_1("[%d]",
-				        cur_definition->array_info->const_index[cur_level]);
-			}
-		}
-		cur_definition = cur_definition->next_def;
-		PRINT_0("\n");
-	}
-}
 
 const char *data_to_str(struct var_type *variable_type,
                         struct arr_info *array_info) {

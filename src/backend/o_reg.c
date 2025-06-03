@@ -77,28 +77,6 @@ void rdesc_fill(int r, struct id *s, int mod) {
 	rdesc[r].next = NULL;
 	rdesc[r].prev = NULL;
 }
-// 写回寄存器内容至内存
-// XXX:没用了/有点用
-// hjj: 不能直接用STO&LOD，先注释掉。
-void asm_write_back(int r) {
-	// if ((rdesc[r].var != NULL) && rdesc[r].mod) {
-	// 	if (rdesc[r].var->scope == 1) /* local var */
-	// 	{
-	// 		input_str(obj_file, "\tSTO (R%u+%u),R%u\n", R_BP,
-	// 		          rdesc[r].var->offset, r);
-	// 	} else /* global var */
-	// 	{
-	// 		input_str(obj_file, "\tLOD R%u,STATIC\n", R_TP);
-	// 		input_str(obj_file, "\tSTO (R%u+%u),R%u\n", R_TP,
-	// 		          rdesc[r].var->offset, r);
-	// 	}
-	// 	rdesc[r].mod = UNMODIFIED;
-	// }
-	perror("tbd write back");
-#ifndef HJJ_DEBUG
-	exit(0);
-#endif
-}
 
 // 加载符号到寄存器
 void asm_load(int r, struct id *s) {
@@ -167,37 +145,3 @@ int reg_find(struct id *s) {
 	return reg_alloc(s);
 }
 
-void asm_load_var(struct id *s, const char *r) {
-	if (ID_IS_GCONST(
-	        s->id_type,
-	        s->variable_type->data_type)) {    // XXX:不知道适不适配string
-		U_TYPE_UPPER_SYM("lla", r, s->label);  // 使用 U_TYPE_UPPER_IMM 宏
-		I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r, r, 0);
-	} else if (ID_IS_INTCONST(s->id_type, s->variable_type->data_type)) {
-		U_TYPE_UPPER_IMM("li", r,
-		                 s->number_info.num);  // 使用 U_TYPE_UPPER_IMM 宏
-	} else {                                   // TEMP or VAR
-		if (s->scope == GLOBAL_TABLE) {
-			U_TYPE_UPPER_SYM("la", r, s->name);  // 使用 U_TYPE_UPPER_IMM 宏
-			I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r, r,
-			            0);  // 使用 I_TYPE_LOAD 宏
-		} else {
-			I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r, "s0",
-			            s->offset);  // 使用 I_TYPE_LOAD 宏
-		}
-	}
-}
-
-void asm_store_var(struct id *s, const char *r) {
-	if (s->scope == GLOBAL_TABLE) {
-		int addr_reg = reg_get();
-		U_TYPE_UPPER_SYM("la", reg_name[addr_reg],
-		                 s->name);  // 使用 U_TYPE_UPPER_IMM 宏
-		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r,
-		             reg_name[addr_reg],
-		             0);  // 使用 S_TYPE_STORE 宏
-	} else {
-		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r, "s0",
-		             s->offset);  // 使用 S_TYPE_STORE 宏
-	}
-}

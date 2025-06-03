@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "e_internal.h"
+#include "e_custom.h"
+
 #include "e_tac.h"
 #include "o_reg.h"
 
@@ -11,29 +14,6 @@ struct tac *tac_head;
 static struct tac *arg_list_head;
 static struct block *block_top;
 
-struct op *__deref(struct op *exp) {
-	struct op *deref_stat = new_op();
-
-	struct id *t_1 = exp->addr;
-	if (!t_1->variable_type->pointer_level) {
-		perror("data is not a pointer");
-#ifndef HJJ_DEBUG
-		exit(0);
-#endif
-	}
-	while (exp->deref_count) {
-		struct id *t_2 =
-		    new_temp(new_var_type(t_1->variable_type->data_type,
-		                          t_1->variable_type->pointer_level - 1,
-		                          t_1->variable_type->is_reference));
-		cat_tac(deref_stat, NEW_TAC_1(TAC_VAR, t_2));
-		cat_tac(deref_stat, NEW_TAC_2(TAC_DEREFER_GET, t_2, t_1));
-		t_1 = t_2;
-		exp->deref_count--;
-	}
-	deref_stat->addr = t_1;
-	return deref_stat;
-}
 
 /**************************************/
 /************ expression **************/
@@ -134,88 +114,6 @@ struct op *process_calculate(struct op *exp_l, struct op *exp_r, int cal) {
 	return exp;
 }
 
-// 处理数组标识符
-static struct op *process_array_identifier(struct op *array_op,
-                                           struct arr_info *index_info) {
-	struct op *id_op = new_op();
-
-	struct id *array = array_op->addr;
-	struct arr_info *array_info = array->array_info;
-	if (!array->variable_type->pointer_level) {
-		perror("id is not from an array");
-#ifndef HJJ_DEBUG
-		exit(0);
-#endif
-	}
-
-	if (array_info->max_level < index_info->max_level) {
-		perror("index level too high");
-#ifndef HJJ_DEBUG
-		exit(0);
-#endif
-	}
-
-	struct id *t_1 =
-	    new_temp(new_var_type(array->variable_type->data_type,
-	                          array->variable_type->pointer_level, 0));
-	int deref_count = 0;
-
-	cat_op(id_op, array_op);
-	cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_1));
-	cat_tac(id_op, NEW_TAC_2(TAC_ASSIGN, t_1, array));
-	for (int cur_level = 0; cur_level <= index_info->max_level; cur_level++) {
-		if (index_info->const_or_not[cur_level] == IS_CONST_INDEX) {
-			if (array_info->const_index[cur_level] <
-			    index_info->const_index[cur_level] + 1) {
-				perror("index size too large");
-#ifndef HJJ_DEBUG
-				exit(0);
-#endif
-			}
-
-			struct id *t_2 =
-			    new_temp(new_var_type(array->variable_type->data_type,
-			                          array->variable_type->pointer_level, 0));
-			struct op *num_op =
-			    process_int(index_info->const_index[cur_level] *
-			                array_info->array_offset[array_info->max_level] /
-			                array_info->array_offset[cur_level] *
-			                DATA_SIZE(array->variable_type->data_type));
-
-			cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_2));
-			cat_tac(id_op, NEW_TAC_3(TAC_PLUS, t_2, t_1, num_op->addr));
-
-			t_1 = t_2;
-			deref_count++;
-		} else {
-			struct op *exp_op = index_info->nonconst_index[cur_level];
-			struct id *index = exp_op->addr;
-			struct id *t_2 =
-			    new_temp(new_var_type(array->variable_type->data_type,
-			                          array->variable_type->pointer_level, 0));
-			struct id *t_inc =
-			    new_temp(new_var_type(index->variable_type->data_type,
-			                          index->variable_type->pointer_level, 0));
-
-			cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_2));
-			cat_tac(id_op, NEW_TAC_1(TAC_VAR, t_inc));
-			cat_op(id_op, exp_op);
-			cat_tac(id_op,
-			        NEW_TAC_3(
-			            TAC_MULTIPLY, t_inc, index,
-			            process_int(DATA_SIZE(array->variable_type->data_type))
-			                ->addr));
-			cat_tac(id_op, NEW_TAC_3(TAC_PLUS, t_2, t_1, t_inc));
-
-			t_1 = t_2;
-			deref_count++;
-		}
-	}
-	id_op->deref_count = deref_count;
-	id_op->addr = t_1;
-
-	return id_op;
-}
 
 // 处理标识符
 struct op *process_identifier(char *name, struct arr_info *index_info) {
@@ -294,91 +192,7 @@ struct op *process_add_identifier(char *name, struct arr_info *array_info) {
 // 	return instance_op;
 // }
 
-// lyc:
-struct op *process_instance_member(struct op *instance_op,
-                                   struct member_ftch *member_fetch) {
-	struct id *instance = instance_op->addr;
-	struct member_def *member = find_member(instance, member_fetch->name);
 
-	int member_pointer_level = member->variable_type->pointer_level;
-	int instance_pointer_level = instance->variable_type->pointer_level;
-	int member_data_type = member->variable_type->data_type;
-	int instance_data_type = instance->variable_type->data_type;
-	int deref_count = instance_op->deref_count;
-	if (member_fetch->is_pointer_fetch && instance_pointer_level == 0) {
-		perror("Can't apply '->' to a non-pointer");
-	}
-	int is_pointer_fetch =
-	    member_fetch->is_pointer_fetch || instance_pointer_level;
-	int is_ref = instance->variable_type->is_reference;
-	struct arr_info *member_index = member_fetch->index_info;
-
-	struct id *t_member_ptr = new_temp(new_var_type(
-	    member_data_type, member_pointer_level + (member_index == NULL),
-	    NOT_REF));  // member_addr
-	struct id *t_instance_ptr = new_temp(new_var_type(
-	    instance_data_type, instance_pointer_level + !is_pointer_fetch,
-	    NOT_REF));  // base_addr
-	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_member_ptr));
-	cat_tac(instance_op, NEW_TAC_1(TAC_VAR, t_instance_ptr));
-	cat_tac(instance_op,
-	        NEW_TAC_2(is_pointer_fetch || is_ref ? TAC_ASSIGN : TAC_REFER,
-	                  t_instance_ptr, instance));
-	cat_tac(instance_op, NEW_TAC_3(TAC_PLUS, t_member_ptr, t_instance_ptr,
-	                               process_int(member->member_offset)->addr));
-	instance_op->deref_count = 1;
-	instance_op->addr = t_member_ptr;
-	// lyc:玄学操作，只是为了正常调用array处理函数↓
-	t_member_ptr->array_info = member->array_info;
-	if (member_index) {
-		instance_op = process_array_identifier(instance_op, member_index);
-		t_member_ptr->array_info = NO_INDEX;
-	}
-	return instance_op;
-}
-
-// 分配整数型数字符号
-struct op *process_int(int integer) {
-	struct op *int_op = new_op();
-
-	BUF_ALLOC(buf);  // 声明一个char数组变量buf，储存符号名
-	sprintf(buf, "%d", integer);
-	struct id *var = add_const_identifier(
-	    buf, ID_NUM,
-	    new_const_type(DATA_INT, 0));  // 向符号表添加以buf为名的符号
-	var->number_info.num.num_int = integer;
-	int_op->addr = var;
-
-	return int_op;
-}
-
-// 分配浮点型数字符号
-struct op *process_float(double floatnum) {
-	struct op *float_op = new_op();
-
-	BUF_ALLOC(buf);
-	sprintf(buf, "%f", floatnum);
-	struct id *var =
-	    add_const_identifier(buf, ID_NUM, new_const_type(DATA_FLOAT, 0));
-	var->number_info.num.num_float = floatnum;
-	float_op->addr = var;
-
-	return float_op;
-}
-
-// 分配字符型数字符号
-struct op *process_char(char character) {
-	struct op *char_op = new_op();
-
-	BUF_ALLOC(buf);
-	sprintf(buf, "%c", character);
-	struct id *var =
-	    add_const_identifier(buf, ID_NUM, new_const_type(DATA_CHAR, 0));
-	var->number_info.num.num_char = character;
-	char_op->addr = var;
-
-	return char_op;
-}
 
 // 处理形如"a++"和"++a"的表达式
 struct op *process_inc(struct op *id_op, int pos) {
@@ -483,55 +297,12 @@ struct op *process_expression_list(struct op *arg_list_pre,
 	return exp_list;
 }
 
-struct var_type *process_struct_type(char *name, int pointer_level,
-                                     int is_reference) {
-	return new_var_type(check_struct_name(name)->struct_info.struct_type,
-	                    pointer_level, is_reference);
-}
 
 /**************************************/
 /************* statement **************/
 /**************************************/
 // 可以考虑用注释形式放到三地址文件？
-struct op *process_struct_head(char *name) {
-	struct op *struct_op = new_op();
-	static int cur_struct_type = DATA_STRUCT_INIT;
 
-	struct id *new_struct = add_identifier(name, ID_STRUCT, NO_TYPE, NO_INDEX);
-	new_struct->struct_info.next_struct = struct_table;
-	new_struct->struct_info.struct_type = cur_struct_type++;
-	struct_table = new_struct;
-	cur_member_offset = 0;
-	struct_op->addr = new_struct;
-	return struct_op;
-}
-
-struct op *process_struct_definition(struct op *struct_head,
-                                     struct member_def *definition_block) {
-	struct id *new_struct = struct_head->addr;
-	new_struct->struct_info.definition_list = definition_block;
-	new_struct->struct_info.struct_offset = cur_member_offset;
-
-	return struct_head;
-}
-
-struct member_def *process_definition(struct var_type *variable_type,
-                                      struct member_def *definition_list) {
-	struct member_def *cur_definition = definition_list;
-	while (cur_definition) {
-		cur_definition->variable_type = variable_type;
-		if (cur_definition->array_info != NO_INDEX) {
-			cur_definition->variable_type->pointer_level =
-			    cur_definition->array_info->max_level + 1;
-		}
-		cur_definition->member_offset = cur_member_offset;
-		cur_member_offset +=
-		    TYPE_SIZE(variable_type, cur_definition->array_info);
-
-		cur_definition = cur_definition->next_def;
-	}
-	return definition_list;
-}
 
 // 处理变量声明，为process_variable函数声明的变量加上类型
 struct op *process_declaration(struct var_type *variable_type,
@@ -821,96 +592,6 @@ struct op *process_assign(struct op *leftval_op, struct op *exp) {
 	return assign_stat;
 }
 
-struct op *process_derefer(struct op *id_op) {
-	struct op *content_stat = id_op;
-
-	content_stat->deref_count++;
-
-	return content_stat;
-}
-
-// 处理被解引用并向内赋值的指针
-struct op *process_derefer_put(struct op *id_op) {
-	struct op *content_stat = new_op();
-
-	struct id *var = id_op->addr;
-	if (!var->variable_type->pointer_level) {
-		perror("data is not a pointer");
-		printf("data name: %s\n", var->name);
-		printf("data type: %d\n", var->variable_type->data_type);
-#ifndef HJJ_DEBUG
-		exit(0);
-#endif
-	}
-
-	// struct id *t = new_temp(var->variable_type);
-	// t->pointer_info.temp_deref_count = id_op->deref_count;
-	content_stat->addr = var;
-	content_stat->deref_count = id_op->deref_count;
-
-	cat_op(content_stat, id_op);
-	// cat_tac(content_stat, NEW_TAC_1(TAC_VAR, t));
-	// cat_tac(content_stat, NEW_TAC_2(TAC_ASSIGN, t, var));
-
-	return content_stat;
-}
-
-// 处理被解引用并从内取值的指针
-struct op *process_derefer_get(struct op *id_op) {
-	// 	struct op *content_stat = new_op();
-
-	// 	struct id *var = id_op->addr;
-	// 	if (!var->variable_type->pointer_level) {
-	// 		perror("data is not a pointer");
-	// #ifndef HJJ_DEBUG
-	// 		exit(0);
-	// #endif
-	// 	}
-
-	// 	struct id *t_1 =
-	// 	    new_temp(new_var_type(var->variable_type->data_type,
-	// 	                          var->variable_type->pointer_level - 1, 0));
-
-	// 	cat_op(content_stat, id_op);
-	// 	cat_tac(content_stat, NEW_TAC_1(TAC_VAR, t_1));
-	// 	cat_tac(content_stat, NEW_TAC_2(TAC_DEREFER_GET, t_1, var));
-	// 	while (--id_op->deref_count) {
-	// 		struct id *t_2 =
-	// 		    new_temp(new_var_type(t_1->variable_type->data_type,
-	// 		                          t_1->variable_type->pointer_level - 1,
-	// 0)); 		cat_tac(content_stat, NEW_TAC_1(TAC_VAR, t_2));
-	// 		cat_tac(content_stat, NEW_TAC_2(TAC_DEREFER_GET, t_2, t_1));
-	// 		t_1 = t_2;
-	// 	}
-
-	// 	content_stat->addr = t_1;
-
-	return __deref(id_op);
-}
-// cur=t19 一级指针，
-//  处理指针对变量的引用
-struct op *process_reference(struct op *id_op) {
-	struct id *var = id_op->addr;
-	if (id_op->deref_count) {
-		return id_op;
-	}
-	struct op *pointer_stat = new_op();
-
-	struct id *t =
-	    new_temp(new_var_type(var->variable_type->data_type,
-	                          var->variable_type->pointer_level + 1, 0));
-	pointer_stat->addr = t;
-
-	cat_op(pointer_stat, id_op);
-	cat_tac(pointer_stat, NEW_TAC_1(TAC_VAR, t));
-	if (var->variable_type->is_reference) {
-		cat_tac(pointer_stat, NEW_TAC_2(TAC_ASSIGN, t, var));
-	} else {
-		cat_tac(pointer_stat, NEW_TAC_2(TAC_REFER, t, var));
-	}
-
-	return pointer_stat;
-}
 
 /**************************************/
 /********* function & program *********/

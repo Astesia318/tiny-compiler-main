@@ -209,19 +209,3 @@ void asm_lc(struct id *s) {
 		}
 	}
 }
-
-// 生成静态数据段
-// XXX:没用了
-void asm_static(void) {
-	int i;
-
-	struct id *sl;
-
-	// for (sl = id_global; sl != NULL; sl = sl->next) {
-	// 	if (sl->id_type == ID_STRING) asm_str(sl);
-	// }
-
-	input_str(obj_file, "STATIC:\n");
-	input_str(obj_file, "\tDBN 0,%u\n", tos);
-	input_str(obj_file, "STACK:\n");
-}

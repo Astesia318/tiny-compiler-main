@@ -1,17 +1,55 @@
 // hjj: tbd, float num
-#include "o_asm.h"
+#include "o_riscv.h"
 
 #include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 #include "e_tac.h"
-#include "o_riscv.h"
+#include "o_wrap.h"
+#include "o_reg.h"
+
+
+
+void asm_load_var(struct id *s, const char *r) {
+	if (ID_IS_GCONST(
+	        s->id_type,
+	        s->variable_type->data_type)) {    // XXX:不知道适不适配string
+		U_TYPE_UPPER_SYM("lla", r, s->label);  // 使用 U_TYPE_UPPER_IMM 宏
+		I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r, r, 0);
+	} else if (ID_IS_INTCONST(s->id_type, s->variable_type->data_type)) {
+		U_TYPE_UPPER_IMM("li", r,
+		                 s->number_info.num);  // 使用 U_TYPE_UPPER_IMM 宏
+	} else {                                   // TEMP or VAR
+		if (s->scope == GLOBAL_TABLE) {
+			U_TYPE_UPPER_SYM("la", r, s->name);  // 使用 U_TYPE_UPPER_IMM 宏
+			I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r, r,
+			            0);  // 使用 I_TYPE_LOAD 宏
+		} else {
+			I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r, "s0",
+			            s->offset);  // 使用 I_TYPE_LOAD 宏
+		}
+	}
+}
+
+void asm_store_var(struct id *s, const char *r) {
+	if (s->scope == GLOBAL_TABLE) {
+		int addr_reg = reg_get();
+		U_TYPE_UPPER_SYM("la", reg_name[addr_reg],
+		                 s->name);  // 使用 U_TYPE_UPPER_IMM 宏
+		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r,
+		             reg_name[addr_reg],
+		             0);  // 使用 S_TYPE_STORE 宏
+	} else {
+		S_TYPE_STORE(STORE_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r, "s0",
+		             s->offset);  // 使用 S_TYPE_STORE 宏
+	}
+}
 
 // 生成二元运算对应的汇编代码
-
 void asm_bin(char *op, struct id *a, struct id *b, struct id *c) {
 	// bc都是立即数,直接计算
 	int reg_a = reg_alloc(a);
@@ -225,7 +263,6 @@ void asm_derefer_put(struct id *pointer, struct id *var) {
 	// var 和 pointer 的值都没改变，所以不用 asm_store_var()
 }
 
-// XXX:需要考虑不同变量的大小，这里默认都是int
 void asm_stack_pivot(struct tac *code) {
 	oon = 0;
 	int var_size = 0;
@@ -247,7 +284,7 @@ void asm_stack_pivot(struct tac *code) {
 	oon = var_size + param_size + 16;
 	tof = LOCAL_OFF;
 	oof = FORMAL_OFF - var_size;
-	if(oon>4096){
+	if (oon > 4096) {
 		perror("Stack out of memory!");
 	}
 	input_str(obj_file, "	addi sp,sp,-%d\n", oon);
@@ -329,9 +366,6 @@ void asm_gvar(struct id *a) {
 }
 // 生成函数返回对应的汇编代码
 void asm_return(struct id *a) {
-	// for (int r = R_GEN; r < R_NUM; r++) asm_write_back(r);
-	// for (int r = R_GEN; r < R_NUM; r++) rdesc_clear_all(r);
-
 	if (a != NULL) /* return value */
 	{
 		int r = reg_find(a);

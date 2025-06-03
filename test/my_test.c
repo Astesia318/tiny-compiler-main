@@ -9,7 +9,7 @@ int main() {
 	int x;
 	int i;
 	for (i = 1; i < 5; i = i + 1) {
-		lt[i].val = i;
+		lt[i].val = i * i;
 		lt[i].next = &lt[i - 1];
 	}
 	cur = &lt[4];
