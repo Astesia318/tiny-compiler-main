@@ -11,7 +11,9 @@
 目前已将三人负责的部分各自打包为共享库so文件，具体情况如下：
 
 riscv.c -> libriscv.so
+
 custom.c -> libcustom.so
+
 internal.c -> libinternal.so
 
 剩余代码为公共部分，在拥有以上库的前提下，可以在删除上述对应的三个源代码的情况下make出目标程序
