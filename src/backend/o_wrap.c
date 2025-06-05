@@ -194,7 +194,11 @@ void asm_lc(struct id *s) {
 	input_str(obj_file, "\t.align	%d\n", TYPE_ALIGN(s->variable_type));
 	input_str(obj_file, ".LC%u:\n", s->label); /* Label for the string */
 	if (s->id_type == ID_STRING) {
-		input_str(obj_file, "\t.string	\"%s\"\n", s->name);
+		if (s->name[0] != '"') {
+			input_str(obj_file, "\t.string	\"%s\"\n", s->name);
+		} else {
+			input_str(obj_file, "\t.string	%s\n", s->name);
+		}
 	} else {
 #if DEBUG_PRINT == 1
 		input_str(obj_file, "\t\t\t\t\t\t\t#	%s\n", t);
