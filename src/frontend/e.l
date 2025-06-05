@@ -50,8 +50,8 @@ MULTI_COMMENT				"/*"([^\*]|(\*)*[^\*/])*(\*)*"*/"
 {ID}						{ yylval.name = strdup(yytext); return IDENTIFIER; }
 {INT_CONST} 				{ yylval.num_int = atoi(yytext); return NUM_INT; }
 {FLOAT_CONST} 				{ yylval.num_float = strtod(yytext,NULL); return NUM_FLOAT; }
-{CHAR_CONST} 				{ yylval.num_char = strdup(yytext)[1]; printf("%c",yylval.num_char); return NUM_CHAR; }
-{STRING_CONST} 				{ yylval.string = strdup(yytext); printf("%s",yylval.string);return TEXT; }
+{CHAR_CONST} 				{ yylval.num_char = strdup(yytext)[1]; return NUM_CHAR; }
+{STRING_CONST} 				{ yylval.string = strdup(yytext); return TEXT; }
 
 "++"					 	{ return INC; }
 "--"  						{ return DEC; }
