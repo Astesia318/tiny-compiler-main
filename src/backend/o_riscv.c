@@ -12,14 +12,12 @@
 #include "o_wrap.h"
 #include "o_reg.h"
 
-
-
 void asm_load_var(struct id *s, const char *r) {
 	if (ID_IS_GCONST(
 	        s->id_type,
-	        s->variable_type->data_type)) {    // XXX:不知道适不适配string
+	        s->variable_type->data_type)) {    // XXX:不知道适不适配string hjj: 不适配string...
 		U_TYPE_UPPER_SYM("lla", r, s->label);  // 使用 U_TYPE_UPPER_IMM 宏
-		I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r, r, 0);
+		if (s->id_type != ID_STRING) I_TYPE_LOAD(LOAD_OP(TYPE_SIZE(s->variable_type, NO_INDEX)), r, r, 0);
 	} else if (ID_IS_INTCONST(s->id_type, s->variable_type->data_type)) {
 		U_TYPE_UPPER_IMM("li", r,
 		                 s->number_info.num);  // 使用 U_TYPE_UPPER_IMM 宏
